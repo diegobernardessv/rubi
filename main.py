@@ -6,6 +6,7 @@ from tkcalendar import DateEntry
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+import customtkinter as ctk
 import ctypes
 import os
 import sys
@@ -38,6 +39,8 @@ class SolicitacoesAppPro:
         
         self.df_original = None
         self.df_filtrado = None
+        self.filtro_data_inicio = None
+        self.filtro_data_fim = None
         
         self.criar_interface()
         
@@ -104,29 +107,30 @@ class SolicitacoesAppPro:
         self.arquivo_entry.insert(0, 'simecr05.xlsx')
         self.arquivo_entry.pack(side=tk.LEFT, padx=(0, 10))
         
-        tk.Button(
+        ctk.CTkButton(
             file_frame,
             text="Procurar...",
             command=self.selecionar_arquivo,
-            bg='#3498db',
-            fg='white',
+            fg_color='#3498db',
+            hover_color='#2980b9',
+            text_color='white',
             font=('Quicksand', 9, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=15
+            corner_radius=8,
+            width=120
         ).pack(side=tk.LEFT, padx=(0, 10))
         
-        tk.Button(
+        ctk.CTkButton(
             file_frame,
             text="🔄 Carregar Dados",
             command=self.carregar_dados,
-            bg='#27ae60',
-            fg='white',
+            fg_color='#27ae60',
+            hover_color='#229954',
+            text_color='white',
             font=('Quicksand', 10, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=20,
-            pady=5
+            corner_radius=8,
+            width=160
         ).pack(side=tk.LEFT)
         
         # Linha 2: Filtros de Data
@@ -166,28 +170,72 @@ class SolicitacoesAppPro:
         )
         self.data_fim.pack(side=tk.LEFT, padx=(0, 20))
         
-        tk.Button(
+        # Atalhos de data
+        tk.Label(filter_frame, text="Atalhos:", font=('Quicksand', 9), bg='white').pack(side=tk.LEFT, padx=(0, 5))
+        
+        ctk.CTkButton(
+            filter_frame,
+            text="Hoje",
+            command=lambda: self.aplicar_atalho_data('hoje'),
+            fg_color='#9b59b6',
+            hover_color='#8e44ad',
+            text_color='white',
+            font=('Quicksand', 8, 'bold'),
+            cursor='hand2',
+            corner_radius=6,
+            width=70
+        ).pack(side=tk.LEFT, padx=2)
+        
+        ctk.CTkButton(
+            filter_frame,
+            text="Semana",
+            command=lambda: self.aplicar_atalho_data('semana'),
+            fg_color='#9b59b6',
+            hover_color='#8e44ad',
+            text_color='white',
+            font=('Quicksand', 8, 'bold'),
+            cursor='hand2',
+            corner_radius=6,
+            width=70
+        ).pack(side=tk.LEFT, padx=2)
+        
+        ctk.CTkButton(
+            filter_frame,
+            text="Mês",
+            command=lambda: self.aplicar_atalho_data('mes'),
+            fg_color='#9b59b6',
+            hover_color='#8e44ad',
+            text_color='white',
+            font=('Quicksand', 8, 'bold'),
+            cursor='hand2',
+            corner_radius=6,
+            width=70
+        ).pack(side=tk.LEFT, padx=(2, 20))
+        
+        ctk.CTkButton(
             filter_frame,
             text="🔍 Aplicar Filtro",
             command=self.aplicar_filtro_data,
-            bg='#e67e22',
-            fg='white',
+            fg_color='#e67e22',
+            hover_color='#d35400',
+            text_color='white',
             font=('Quicksand', 9, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=15
+            corner_radius=8,
+            width=140
         ).pack(side=tk.LEFT, padx=(0, 10))
         
-        tk.Button(
+        ctk.CTkButton(
             filter_frame,
             text="🔄 Limpar Filtro",
             command=self.limpar_filtro,
-            bg='#95a5a6',
-            fg='white',
+            fg_color='#95a5a6',
+            hover_color='#7f8c8d',
+            text_color='white',
             font=('Quicksand', 9, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=15
+            corner_radius=8,
+            width=140
         ).pack(side=tk.LEFT)
         
         # ========== SISTEMA DE ABAS ==========
@@ -200,6 +248,7 @@ class SolicitacoesAppPro:
         
         # Criar abas
         self.criar_aba_dados()
+        self.criar_aba_status_atendimento()
         self.criar_aba_dashboard()
         self.criar_aba_analise()
         self.criar_aba_resumo()
@@ -220,7 +269,7 @@ class SolicitacoesAppPro:
     # ==================== ABA 1: DADOS ====================
     def criar_aba_dados(self):
         self.aba_dados = tk.Frame(self.notebook, bg='white')
-        self.notebook.add(self.aba_dados, text='📋 Dados')
+        self.notebook.add(self.aba_dados, text='📋 Solicitações Pendentes')
         
         # Info e exportação
         info_frame = tk.Frame(self.aba_dados, bg='white', relief=tk.RAISED, borderwidth=2)
@@ -236,16 +285,29 @@ class SolicitacoesAppPro:
         )
         self.info_label.pack(side=tk.LEFT, padx=15, pady=8)
         
-        tk.Button(
+        # Badge de filtro ativo
+        self.filtro_badge = tk.Label(
+            info_frame,
+            text="",
+            font=('Quicksand', 9, 'bold'),
+            bg='white',
+            fg='white',
+            padx=10,
+            pady=3
+        )
+        self.filtro_badge.pack(side=tk.LEFT, padx=(0, 15))
+        
+        ctk.CTkButton(
             info_frame,
             text="💾 Exportar para Excel",
             command=self.exportar_excel,
-            bg='#16a085',
-            fg='white',
+            fg_color='#16a085',
+            hover_color='#138d75',
+            text_color='white',
             font=('Quicksand', 9, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=15
+            corner_radius=8,
+            width=180
         ).pack(side=tk.RIGHT, padx=15, pady=5)
         
         # Título centralizado
@@ -255,32 +317,63 @@ class SolicitacoesAppPro:
         
         tk.Label(
             title_frame,
-            text="⚡ Solicitações Pendentes",
+            text="📋 Solicitações Pendentes",
             font=('Quicksand', 16, 'bold'),
             bg='#2c3e50',
             fg='#FFD700'
         ).pack(expand=True)
         
+        # Campo de busca
+        search_frame = tk.Frame(self.aba_dados, bg='white', relief=tk.RAISED, borderwidth=2)
+        search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        tk.Label(
+            search_frame,
+            text="🔍 Buscar:",
+            font=('Quicksand', 10, 'bold'),
+            bg='white'
+        ).pack(side=tk.LEFT, padx=(15, 5), pady=8)
+        
+        self.search_var = tk.StringVar()
+        self.search_var.trace('w', lambda *args: self.filtrar_tabela_busca())
+        
+        search_entry = tk.Entry(
+            search_frame,
+            textvariable=self.search_var,
+            font=('Quicksand', 10),
+            width=50
+        )
+        search_entry.pack(side=tk.LEFT, padx=(0, 10), pady=8)
+        
+        tk.Label(
+            search_frame,
+            text="(Busca por Descrição, Setor, Solicitante, Código)",
+            font=('Quicksand', 8),
+            bg='white',
+            fg='#7f8c8d'
+        ).pack(side=tk.LEFT, padx=(0, 15))
+        
         # Tabela
         table_frame = tk.Frame(self.aba_dados, bg='white', relief=tk.RAISED, borderwidth=2)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
-        scroll_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL)
-        scroll_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL)
+        # Configurar grid
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
         
         self.tree = ttk.Treeview(
             table_frame,
-            yscrollcommand=scroll_y.set,
-            xscrollcommand=scroll_x.set,
             selectmode='extended'
         )
         
-        scroll_y.config(command=self.tree.yview)
-        scroll_x.config(command=self.tree.xview)
+        scroll_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        scroll_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
         
-        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
-        self.tree.pack(fill=tk.BOTH, expand=True)
+        self.tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
+        
+        self.tree.grid(row=0, column=0, sticky='nsew')
+        scroll_y.grid(row=0, column=1, sticky='ns')
+        scroll_x.grid(row=1, column=0, sticky='ew')
         
         style = ttk.Style()
         style.theme_use('clam')
@@ -295,10 +388,158 @@ class SolicitacoesAppPro:
         style.configure('Treeview.Heading', font=('Quicksand', 10, 'bold'), background='#34495e', foreground='white')
         style.map('Treeview', background=[('selected', '#3498db')])
     
-    # ==================== ABA 2: DASHBOARD ====================
+    # ==================== ABA 2: STATUS DE ATENDIMENTO ====================
+    def criar_aba_status_atendimento(self):
+        self.aba_status = tk.Frame(self.notebook, bg='white')
+        self.notebook.add(self.aba_status, text='✅ Status de Atendimento')
+        
+        # Info e KPIs
+        info_frame = tk.Frame(self.aba_status, bg='white', relief=tk.RAISED, borderwidth=2)
+        info_frame.pack(fill=tk.X, pady=(10, 10), padx=10)
+        
+        self.status_info_label = tk.Label(
+            info_frame,
+            text="📊 Nenhum dado carregado",
+            font=('Quicksand', 10),
+            bg='white',
+            fg='#7f8c8d',
+            anchor='w'
+        )
+        self.status_info_label.pack(side=tk.LEFT, padx=15, pady=8)
+        
+        # KPIs de atendimento
+        self.kpi_atendidas = tk.Label(
+            info_frame,
+            text="",
+            font=('Quicksand', 9, 'bold'),
+            bg='white',
+            fg='#27ae60'
+        )
+        self.kpi_atendidas.pack(side=tk.LEFT, padx=10)
+        
+        self.kpi_parciais = tk.Label(
+            info_frame,
+            text="",
+            font=('Quicksand', 9, 'bold'),
+            bg='white',
+            fg='#e67e22'
+        )
+        self.kpi_parciais.pack(side=tk.LEFT, padx=10)
+        
+        self.kpi_nao_atendidas = tk.Label(
+            info_frame,
+            text="",
+            font=('Quicksand', 9, 'bold'),
+            bg='white',
+            fg='#e74c3c'
+        )
+        self.kpi_nao_atendidas.pack(side=tk.LEFT, padx=10)
+        
+        ctk.CTkButton(
+            info_frame,
+            text="💾 Exportar para Excel",
+            command=self.exportar_status_excel,
+            fg_color='#16a085',
+            hover_color='#138d75',
+            text_color='white',
+            font=('Quicksand', 9, 'bold'),
+            cursor='hand2',
+            corner_radius=8,
+            width=180
+        ).pack(side=tk.RIGHT, padx=15, pady=5)
+        
+        # Título centralizado
+        title_frame = tk.Frame(self.aba_status, bg='#2c3e50', height=50)
+        title_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        title_frame.pack_propagate(False)
+        
+        tk.Label(
+            title_frame,
+            text="✅ Controle de Atendimento das Solicitações",
+            font=('Quicksand', 16, 'bold'),
+            bg='#2c3e50',
+            fg='#FFD700'
+        ).pack(expand=True)
+        
+        # Filtro de Status de Atendimento
+        filtro_status_frame = tk.Frame(self.aba_status, bg='white', relief=tk.RAISED, borderwidth=2)
+        filtro_status_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        tk.Label(
+            filtro_status_frame,
+            text="🔍 Filtrar por Status:",
+            font=('Quicksand', 10, 'bold'),
+            bg='white'
+        ).pack(side=tk.LEFT, padx=15, pady=8)
+        
+        self.filtro_atendimento_var = tk.StringVar(value="Todas")
+        filtro_combo = ttk.Combobox(
+            filtro_status_frame,
+            textvariable=self.filtro_atendimento_var,
+            values=["Todas", "TOTALMENTE ATENDIDA", "PARCIALMENTE ATENDIDA", "NÃO ATENDIDA"],
+            state='readonly',
+            font=('Quicksand', 9),
+            width=25
+        )
+        filtro_combo.pack(side=tk.LEFT, padx=(0, 20), pady=8)
+        filtro_combo.bind('<<ComboboxSelected>>', lambda e: self.aplicar_filtro_atendimento())
+        
+        # Campo de busca
+        search_frame = tk.Frame(self.aba_status, bg='white', relief=tk.RAISED, borderwidth=2)
+        search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        tk.Label(
+            search_frame,
+            text="🔍 Buscar:",
+            font=('Quicksand', 10, 'bold'),
+            bg='white'
+        ).pack(side=tk.LEFT, padx=(15, 5), pady=8)
+        
+        self.status_search_var = tk.StringVar()
+        self.status_search_var.trace('w', lambda *args: self.filtrar_status_busca())
+        
+        search_entry = tk.Entry(
+            search_frame,
+            textvariable=self.status_search_var,
+            font=('Quicksand', 10),
+            width=50
+        )
+        search_entry.pack(side=tk.LEFT, padx=(0, 10), pady=8)
+        
+        tk.Label(
+            search_frame,
+            text="(Busca por Descrição, Setor, Solicitante, Código)",
+            font=('Quicksand', 8),
+            bg='white',
+            fg='#7f8c8d'
+        ).pack(side=tk.LEFT, padx=(0, 15))
+        
+        # Tabela
+        table_frame = tk.Frame(self.aba_status, bg='white', relief=tk.RAISED, borderwidth=2)
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        
+        # Configurar grid
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
+        
+        self.status_tree = ttk.Treeview(
+            table_frame,
+            style='Treeview'
+        )
+        
+        scroll_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.status_tree.yview)
+        scroll_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.status_tree.xview)
+        
+        self.status_tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
+        
+        self.status_tree.grid(row=0, column=0, sticky='nsew')
+        scroll_y.grid(row=0, column=1, sticky='ns')
+        scroll_x.grid(row=1, column=0, sticky='ew')
+    
+    # ==================== ABA 3: DASHBOARD ====================
     def criar_aba_dashboard(self):
         self.aba_dashboard = tk.Frame(self.notebook, bg='#ecf0f1')
-        self.notebook.add(self.aba_dashboard, text='📈 Dashboard')
+        self.notebook.add(self.aba_dashboard, text='� Dashboard')
         
         # Container com scroll
         canvas = tk.Canvas(self.aba_dashboard, bg='#ecf0f1')
@@ -328,7 +569,7 @@ class SolicitacoesAppPro:
     # ==================== ABA 3: ANÁLISE DETALHADA ====================
     def criar_aba_analise(self):
         self.aba_analise = tk.Frame(self.notebook, bg='#ecf0f1')
-        self.notebook.add(self.aba_analise, text='📊 Análise Detalhada')
+        self.notebook.add(self.aba_analise, text='� Análise Detalhada')
         
         # Container com scroll
         canvas = tk.Canvas(self.aba_analise, bg='#ecf0f1')
@@ -364,18 +605,18 @@ class SolicitacoesAppPro:
         btn_frame = tk.Frame(self.aba_resumo, bg='white')
         btn_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        tk.Button(
+        ctk.CTkButton(
             btn_frame,
-            text="📄 Exportar Resumo (TXT)",
+            text=" Exportar Resumo (TXT)",
             command=self.exportar_resumo,
-            bg='#9b59b6',
-            fg='white',
+            fg_color='#16a085',
+            hover_color='#138d75',
+            text_color='white',
             font=('Quicksand', 10, 'bold'),
             cursor='hand2',
-            relief=tk.FLAT,
-            padx=20,
-            pady=8
-        ).pack(side=tk.RIGHT)
+            corner_radius=8,
+            width=220
+        ).pack(side=tk.RIGHT, padx=20)
         
         # Área de texto com scroll
         text_frame = tk.Frame(self.aba_resumo, bg='white')
@@ -417,16 +658,21 @@ class SolicitacoesAppPro:
             messagebox.showwarning("Aviso", "Por favor, selecione um arquivo!")
             return
         
+        # Mostrar loading state
+        self.info_label.config(
+            text="⏳ Carregando dados...",
+            fg='#e67e22'
+        )
+        self.root.update()
+        
         try:
             df = pd.read_excel(arquivo, sheet_name='Relatório de Controle de entr')
             
+            # Excluir apenas grupos (df_original = base para Dashboard/Análise/Resumo)
             grupos_excluir = [4003, 4037]
-            df_filtrado = df[~df['Grupo'].isin(grupos_excluir)]
+            df_base = df[~df['Grupo'].isin(grupos_excluir)]
             
-            # Filtrar 'EM APROVAÇÃO' e 'PRE-REQUISIÇÃO GERADA' (lógica da aba Dados)
-            status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
-            df_filtrado = df_filtrado[~df_filtrado['Status'].isin(status_excluir)]
-            
+            # Mapeamento para aba Dados e Dashboard
             colunas_mapeamento = {
                 'Numero SA': 'Numero SA',
                 'Codigo': 'Codigo',
@@ -441,15 +687,57 @@ class SolicitacoesAppPro:
                 'Observacao': 'Observacao'
             }
             
-            df_filtrado = df_filtrado[list(colunas_mapeamento.keys())]
-            df_filtrado = df_filtrado.rename(columns=colunas_mapeamento)
+            # Mapeamento adicional para aba Status de Atendimento
+            colunas_status_mapeamento = {
+                'Numero SA': 'Numero SA',
+                'Codigo': 'Codigo',
+                'Descricao do Material': 'Descricao',
+                'UM': 'Unidade de Medida',
+                'Armazem': 'Armazem',
+                'Quantidade': 'Quantidade Solicitada',
+                'Qtd. Atendida': 'Qtd. Atendida',
+                'Atendimento': 'Atendimento',
+                'Dt. Emissao': 'Data Emissao',
+                'Dt. Atendido': 'Dt. Atendido',
+                'Setor': 'Setor',
+                'Solicitante': 'Solicitante',
+                'Custo Unitario': 'Custo Unitario',
+                'Custo Total': 'Custo Total'
+            }
             
-            df_filtrado['Data Emissao'] = pd.to_datetime(df_filtrado['Data Emissao'], errors='coerce')
+            # Criar df_base para abas normais
+            df_base = df_base[list(colunas_mapeamento.keys())]
+            df_base = df_base.rename(columns=colunas_mapeamento)
+            df_base['Data Emissao'] = pd.to_datetime(df_base['Data Emissao'], errors='coerce')
             
-            self.df_original = df_filtrado.copy()
-            self.df_filtrado = df_filtrado.copy()
+            # Criar df_status_base para aba Status de Atendimento
+            df_status_base = df[~df['Grupo'].isin(grupos_excluir)]
+            df_status_base = df_status_base[list(colunas_status_mapeamento.keys())]
+            df_status_base = df_status_base.rename(columns=colunas_status_mapeamento)
+            df_status_base['Data Emissao'] = pd.to_datetime(df_status_base['Data Emissao'], errors='coerce')
+            df_status_base['Dt. Atendido'] = pd.to_datetime(df_status_base['Dt. Atendido'], errors='coerce')
             
-            self.atualizar_tabela(self.df_filtrado)
+            # df_original = TODOS os dados (sem grupos, mas COM todos os status)
+            self.df_original = df_base.copy()
+            
+            # df_filtrado = inicialmente igual ao df_original (Dashboard usa isso)
+            self.df_filtrado = df_base.copy()
+            
+            # Para aba Dados: filtrar status (sem EM APROVAÇÃO e PRE-REQUISIÇÃO GERADA)
+            status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
+            df_dados = df_base[~df_base['Status'].isin(status_excluir)].copy()
+            
+            # Para aba Status de Atendimento: guardar dados completos
+            self.df_status_original = df_status_base.copy()
+            self.df_status_filtrado = df_status_base.copy()
+            
+            # Atualizar tabela da aba Dados (COM filtro de status)
+            self.atualizar_tabela(df_dados)
+            
+            # Atualizar aba Status de Atendimento
+            self.atualizar_tabela_status(self.df_status_filtrado)
+            
+            # Atualizar Dashboard/Análise/Resumo (SEM filtro de status - usa df_filtrado)
             self.atualizar_dashboard()
             self.atualizar_analise()
             self.atualizar_resumo()
@@ -531,6 +819,29 @@ class SolicitacoesAppPro:
             fg='#27ae60'
         )
     
+    def aplicar_atalho_data(self, tipo):
+        """Aplicar atalhos de data (Hoje, Semana, Mês)"""
+        from datetime import datetime, timedelta
+        
+        hoje = datetime.now().date()
+        
+        if tipo == 'hoje':
+            self.data_inicio.set_date(hoje)
+            self.data_fim.set_date(hoje)
+        elif tipo == 'semana':
+            # Início da semana (segunda-feira)
+            inicio_semana = hoje - timedelta(days=hoje.weekday())
+            self.data_inicio.set_date(inicio_semana)
+            self.data_fim.set_date(hoje)
+        elif tipo == 'mes':
+            # Primeiro dia do mês
+            inicio_mes = hoje.replace(day=1)
+            self.data_inicio.set_date(inicio_mes)
+            self.data_fim.set_date(hoje)
+        
+        # Aplicar filtro automaticamente
+        self.aplicar_filtro_data()
+    
     def aplicar_filtro_data(self):
         if self.df_original is None:
             messagebox.showwarning("Aviso", "Carregue os dados primeiro!")
@@ -547,26 +858,55 @@ class SolicitacoesAppPro:
                 messagebox.showwarning("Aviso", "A data inicial não pode ser maior que a data final!")
                 return
             
-            df_filtrado = self.df_original[
+            # Guardar datas do filtro
+            self.filtro_data_inicio = data_inicio_pd
+            self.filtro_data_fim = data_fim_pd
+            
+            # Filtrar por data (para Dashboard/Análise/Resumo)
+            df_filtrado_data = self.df_original[
                 (self.df_original['Data Emissao'] >= data_inicio_pd) &
                 (self.df_original['Data Emissao'] <= data_fim_pd)
             ]
             
-            # Aplicar filtro de status (excluir 'EM APROVAÇÃO' e 'PRE-REQUISIÇÃO GERADA')
+            # Para aba Dados: aplicar filtro de status também
             status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
-            df_filtrado = df_filtrado[~df_filtrado['Status'].isin(status_excluir)]
+            df_dados = df_filtrado_data[~df_filtrado_data['Status'].isin(status_excluir)]
             
-            self.df_filtrado = df_filtrado.copy()
-            self.atualizar_tabela(self.df_filtrado)
+            # df_filtrado = usado por Dashboard/Análise/Resumo (SEM filtro de status)
+            self.df_filtrado = df_filtrado_data.copy()
+            
+            # Filtrar aba Status de Atendimento por data também
+            if hasattr(self, 'df_status_original'):
+                df_status_filtrado_data = self.df_status_original[
+                    (self.df_status_original['Data Emissao'] >= data_inicio_pd) &
+                    (self.df_status_original['Data Emissao'] <= data_fim_pd)
+                ]
+                self.df_status_filtrado = df_status_filtrado_data.copy()
+            
+            # Atualizar tabela da aba Dados (COM filtro de status)
+            self.atualizar_tabela(df_dados)
+            
+            # Atualizar aba Status de Atendimento
+            if hasattr(self, 'df_status_filtrado'):
+                self.atualizar_tabela_status(self.df_status_filtrado)
+            
+            # Atualizar Dashboard/Análise/Resumo (SEM filtro de status)
             self.atualizar_dashboard()
             self.atualizar_analise()
             self.atualizar_resumo()
+            
+            # Atualizar badge de filtro ativo
+            self.filtro_badge.config(
+                text=f"🔍 FILTRO ATIVO: {data_inicio.strftime('%d/%m/%Y')} - {data_fim.strftime('%d/%m/%Y')}",
+                bg='#3498db',
+                fg='white'
+            )
             
             messagebox.showinfo(
                 "Filtro Aplicado",
                 f"✅ Filtro de data aplicado!\n\n"
                 f"Período: {data_inicio.strftime('%d/%m/%Y')} até {data_fim.strftime('%d/%m/%Y')}\n"
-                f"Solicitações encontradas: {df_filtrado['Numero SA'].nunique()}"
+                f"Solicitações encontradas: {df_filtrado_data['Numero SA'].nunique()}"
             )
             
         except Exception as e:
@@ -577,15 +917,36 @@ class SolicitacoesAppPro:
             messagebox.showwarning("Aviso", "Carregue os dados primeiro!")
             return
         
-        # Aplicar filtro de status (excluir 'EM APROVAÇÃO' e 'PRE-REQUISIÇÃO GERADA')
-        status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
-        df_filtrado = self.df_original[~self.df_original['Status'].isin(status_excluir)]
+        # Limpar datas do filtro
+        self.filtro_data_inicio = None
+        self.filtro_data_fim = None
         
-        self.df_filtrado = df_filtrado.copy()
-        self.atualizar_tabela(self.df_filtrado)
+        # Para aba Dados: filtrar status (excluir 'EM APROVAÇÃO' e 'PRE-REQUISIÇÃO GERADA')
+        status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
+        df_dados = self.df_original[~self.df_original['Status'].isin(status_excluir)]
+        
+        # Para Dashboard/Análise/Resumo: usar df_original completo
+        self.df_filtrado = self.df_original.copy()
+        
+        # Restaurar dados originais da aba Status de Atendimento
+        if hasattr(self, 'df_status_original'):
+            self.df_status_filtrado = self.df_status_original.copy()
+        
+        # Atualizar apenas a tabela da aba Dados com filtro de status
+        self.atualizar_tabela(df_dados)
+        
+        # Atualizar aba Status de Atendimento
+        if hasattr(self, 'df_status_filtrado'):
+            self.atualizar_tabela_status(self.df_status_filtrado)
+        
+        # Dashboard/Análise/Resumo usam df_filtrado (sem filtro de status)
         self.atualizar_dashboard()
         self.atualizar_analise()
         self.atualizar_resumo()
+        
+        # Remover badge de filtro
+        self.filtro_badge.config(text="", bg='white')
+        
         messagebox.showinfo("Filtro Limpo", "✅ Filtro de data removido. Exibindo todos os dados.")
     
     # ==================== ATUALIZAR DASHBOARD ====================
@@ -809,6 +1170,40 @@ class SolicitacoesAppPro:
         
         df = self.df_filtrado
         
+        # Calcular período e dias úteis
+        if self.filtro_data_inicio and self.filtro_data_fim:
+            # Se há filtro ativo, usar as datas do filtro
+            data_inicio_str = self.filtro_data_inicio.strftime('%d/%m/%Y')
+            data_fim_str = self.filtro_data_fim.strftime('%d/%m/%Y')
+            
+            # Calcular dias úteis (segunda a sexta)
+            from datetime import timedelta
+            dias_uteis = 0
+            data_atual = self.filtro_data_inicio.date()
+            data_fim_date = self.filtro_data_fim.date()
+            
+            while data_atual <= data_fim_date:
+                # 0 = segunda, 6 = domingo
+                if data_atual.weekday() < 5:  # Segunda a sexta
+                    dias_uteis += 1
+                data_atual += timedelta(days=1)
+        else:
+            # Sem filtro, usar min/max dos dados
+            data_inicio_str = df['Data Emissao'].min().strftime('%d/%m/%Y')
+            data_fim_str = df['Data Emissao'].max().strftime('%d/%m/%Y')
+            
+            # Calcular dias úteis baseado nas datas únicas nos dados
+            from datetime import timedelta
+            dias_uteis = 0
+            data_min = df['Data Emissao'].min().date()
+            data_max = df['Data Emissao'].max().date()
+            data_atual = data_min
+            
+            while data_atual <= data_max:
+                if data_atual.weekday() < 5:  # Segunda a sexta
+                    dias_uteis += 1
+                data_atual += timedelta(days=1)
+        
         # Gerar resumo
         resumo = f"""
 {'='*80}
@@ -817,9 +1212,9 @@ class SolicitacoesAppPro:
 
 📅 PERÍODO ANALISADO
 {'─'*80}
-Data Início: {df['Data Emissao'].min().strftime('%d/%m/%Y')}
-Data Fim:    {df['Data Emissao'].max().strftime('%d/%m/%Y')}
-Dias úteis:  {df['Data Emissao'].dt.date.nunique()} dias
+Data Início: {data_inicio_str}
+Data Fim:    {data_fim_str}
+Dias úteis:  {dias_uteis} dias
 
 📊 ESTATÍSTICAS GERAIS
 {'─'*80}
@@ -873,6 +1268,179 @@ DBSolutions Lab - © 2026
         
         self.resumo_text.insert('1.0', resumo)
         self.resumo_text.config(state=tk.DISABLED)
+    
+    # ==================== BUSCA RÁPIDA ====================
+    def filtrar_tabela_busca(self):
+        """Filtrar tabela em tempo real baseado na busca"""
+        if self.df_filtrado is None or self.df_filtrado.empty:
+            return
+        
+        termo_busca = self.search_var.get().strip().lower()
+        
+        if not termo_busca:
+            # Se busca vazia, mostrar todos os dados filtrados
+            self.atualizar_tabela(self.df_filtrado)
+            return
+        
+        # Filtrar por Descrição, Setor, Solicitante ou Código
+        df_busca = self.df_filtrado[
+            self.df_filtrado['Descricao'].str.lower().str.contains(termo_busca, na=False) |
+            self.df_filtrado['Setor'].str.lower().str.contains(termo_busca, na=False) |
+            self.df_filtrado['Solicitante'].str.lower().str.contains(termo_busca, na=False) |
+            self.df_filtrado['Codigo'].astype(str).str.lower().str.contains(termo_busca, na=False)
+        ]
+        
+        self.atualizar_tabela(df_busca)
+    
+    # ==================== ABA STATUS DE ATENDIMENTO - FUNÇÕES ====================
+    def atualizar_tabela_status(self, df):
+        """Atualizar tabela da aba Status de Atendimento"""
+        self.status_tree.delete(*self.status_tree.get_children())
+        
+        if df is None or df.empty:
+            self.status_info_label.config(text="📊 Nenhum dado para exibir")
+            self.kpi_atendidas.config(text="")
+            self.kpi_parciais.config(text="")
+            self.kpi_nao_atendidas.config(text="")
+            return
+        
+        # Configurar colunas
+        colunas = list(df.columns)
+        self.status_tree['columns'] = colunas
+        self.status_tree['show'] = 'headings'
+        
+        # Configurar larguras e cabeçalhos
+        larguras = {
+            'Numero SA': 90,
+            'Codigo': 90,
+            'Descricao': 350,
+            'Unidade de Medida': 50,
+            'Armazem': 100,
+            'Quantidade Solicitada': 90,
+            'Qtd. Atendida': 90,
+            'Atendimento': 180,
+            'Data Emissao': 90,
+            'Dt. Atendido': 90,
+            'Setor': 250,
+            'Solicitante': 150,
+            'Custo Unitario': 100,
+            'Custo Total': 100
+        }
+        
+        for col in colunas:
+            width = larguras.get(col, 120)
+            self.status_tree.column(col, width=width, anchor='w')
+            
+            # Cabeçalhos customizados
+            if col == 'Unidade de Medida':
+                self.status_tree.heading(col, text='U.M.')
+            elif col == 'Data Emissao':
+                self.status_tree.heading(col, text='Dt.Emissão')
+            elif col == 'Quantidade Solicitada':
+                self.status_tree.heading(col, text='Qtd.Solicitada')
+            else:
+                self.status_tree.heading(col, text=col)
+        
+        # Inserir dados
+        for idx, row in df.iterrows():
+            valores = []
+            for col in colunas:
+                valor = row[col]
+                if pd.isna(valor):
+                    valores.append('')
+                elif col in ['Data Emissao', 'Dt. Atendido'] and isinstance(valor, pd.Timestamp):
+                    valores.append(valor.strftime('%d/%m/%Y'))
+                elif col in ['Quantidade Solicitada', 'Qtd. Atendida']:
+                    if valor == int(valor):
+                        valores.append(str(int(valor)))
+                    else:
+                        valores.append(str(valor))
+                elif col in ['Custo Unitario', 'Custo Total']:
+                    valores.append(f"R$ {valor:,.2f}" if not pd.isna(valor) else '')
+                else:
+                    valores.append(str(valor))
+            
+            self.status_tree.insert('', tk.END, values=valores)
+        
+        # Atualizar KPIs
+        total = len(df)
+        atendidas = len(df[df['Atendimento'] == 'TOTALMENTE ATENDIDA'])
+        parciais = len(df[df['Atendimento'] == 'PARCIALMENTE ATENDIDA'])
+        nao_atendidas = len(df[df['Atendimento'] == 'NÃO ATENDIDA'])
+        
+        perc_atendidas = (atendidas / total * 100) if total > 0 else 0
+        perc_parciais = (parciais / total * 100) if total > 0 else 0
+        perc_nao_atendidas = (nao_atendidas / total * 100) if total > 0 else 0
+        
+        self.status_info_label.config(
+            text=f"📊 Exibindo {df['Numero SA'].nunique()} solicitações | {total} itens",
+            fg='#27ae60'
+        )
+        
+        self.kpi_atendidas.config(text=f"📦 {atendidas} Atendidas ({perc_atendidas:.1f}%)")
+        self.kpi_parciais.config(text=f"⚠️ {parciais} Parciais ({perc_parciais:.1f}%)")
+        self.kpi_nao_atendidas.config(text=f"❌ {nao_atendidas} Não Atendidas ({perc_nao_atendidas:.1f}%)")
+    
+    def aplicar_filtro_atendimento(self):
+        """Filtrar por status de atendimento"""
+        if not hasattr(self, 'df_status_filtrado') or self.df_status_filtrado is None:
+            return
+        
+        filtro = self.filtro_atendimento_var.get()
+        
+        if filtro == "Todas":
+            df_filtrado = self.df_status_filtrado.copy()
+        else:
+            df_filtrado = self.df_status_filtrado[self.df_status_filtrado['Atendimento'] == filtro]
+        
+        self.atualizar_tabela_status(df_filtrado)
+    
+    def filtrar_status_busca(self):
+        """Filtrar tabela de status em tempo real baseado na busca"""
+        if not hasattr(self, 'df_status_filtrado') or self.df_status_filtrado is None or self.df_status_filtrado.empty:
+            return
+        
+        termo_busca = self.status_search_var.get().strip().lower()
+        
+        # Aplicar filtro de status de atendimento primeiro
+        filtro = self.filtro_atendimento_var.get()
+        if filtro == "Todas":
+            df_base = self.df_status_filtrado.copy()
+        else:
+            df_base = self.df_status_filtrado[self.df_status_filtrado['Atendimento'] == filtro]
+        
+        if not termo_busca:
+            self.atualizar_tabela_status(df_base)
+            return
+        
+        # Filtrar por Descrição, Setor, Solicitante ou Código
+        df_busca = df_base[
+            df_base['Descricao'].str.lower().str.contains(termo_busca, na=False) |
+            df_base['Setor'].str.lower().str.contains(termo_busca, na=False) |
+            df_base['Solicitante'].str.lower().str.contains(termo_busca, na=False) |
+            df_base['Codigo'].astype(str).str.lower().str.contains(termo_busca, na=False)
+        ]
+        
+        self.atualizar_tabela_status(df_busca)
+    
+    def exportar_status_excel(self):
+        """Exportar dados da aba Status de Atendimento para Excel"""
+        if not hasattr(self, 'df_status_filtrado') or self.df_status_filtrado is None or self.df_status_filtrado.empty:
+            messagebox.showwarning("Aviso", "Não há dados para exportar!")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            initialfile="status_atendimento.xlsx"
+        )
+        
+        if filename:
+            try:
+                self.df_status_filtrado.to_excel(filename, index=False, sheet_name='Status Atendimento')
+                messagebox.showinfo("Sucesso", f"✅ Dados exportados com sucesso!\n\nArquivo: {filename}")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
     
     # ==================== EXPORTAÇÕES ====================
     def exportar_excel(self):
@@ -928,7 +1496,12 @@ DBSolutions Lab - © 2026
 
 if __name__ == "__main__":
     _registrar_fontes()
-    root = tk.Tk()
+    
+    # Configurar tema do CustomTkinter
+    ctk.set_appearance_mode("light")  # Modes: "light", "dark", "system"
+    ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
+    
+    root = ctk.CTk()  # Usar CTk ao invés de tk.Tk()
     app = SolicitacoesAppPro(root)
     try:
         root.mainloop()
