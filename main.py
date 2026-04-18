@@ -106,15 +106,15 @@ class SolicitacoesAppPro:
         tk.Label(
             file_frame,
             text="📂 Arquivo:",
-            font=('Quicksand', 10, 'bold'),
+            font=('Quicksand', 12, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=(0, 10))
         
         self.arquivo_entry = ctk.CTkEntry(
             file_frame,
-            font=('Quicksand', 10),
+            font=('Quicksand', 11),
             width=400,
-            height=32,
+            height=36,
             corner_radius=8,
             border_width=2
         )
@@ -128,10 +128,11 @@ class SolicitacoesAppPro:
             fg_color='#3498db',
             hover_color='#2980b9',
             text_color='white',
-            font=('Quicksand', 9, 'bold'),
+            font=('Quicksand', 11, 'bold'),
             cursor='hand2',
             corner_radius=8,
-            width=120
+            width=130,
+            height=36
         ).pack(side=tk.LEFT, padx=(0, 10))
         
         ctk.CTkButton(
@@ -141,10 +142,11 @@ class SolicitacoesAppPro:
             fg_color='#27ae60',
             hover_color='#229954',
             text_color='white',
-            font=('Quicksand', 10, 'bold'),
+            font=('Quicksand', 11, 'bold'),
             cursor='hand2',
             corner_radius=8,
-            width=160
+            width=170,
+            height=36
         ).pack(side=tk.LEFT)
         
         # Linha 2: Filtros de Data
@@ -154,11 +156,11 @@ class SolicitacoesAppPro:
         tk.Label(
             filter_frame,
             text="📅 Filtrar por Data de Emissão:",
-            font=('Quicksand', 10, 'bold'),
+            font=('Quicksand', 12, 'bold'),
             bg='white'
-        ).pack(side=tk.LEFT, padx=(0, 20))
+        ).pack(side=tk.LEFT, padx=(0, 10))
         
-        tk.Label(filter_frame, text="De:", font=('Quicksand', 9), bg='white').pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(filter_frame, text="De:", font=('Quicksand', 12, 'bold'), bg='white').pack(side=tk.LEFT, padx=(0, 5))
         self.data_inicio = DateEntry(
             filter_frame,
             font=('Quicksand', 9),
@@ -171,7 +173,7 @@ class SolicitacoesAppPro:
         )
         self.data_inicio.pack(side=tk.LEFT, padx=(0, 20))
         
-        tk.Label(filter_frame, text="Até:", font=('Quicksand', 9), bg='white').pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(filter_frame, text="Até:", font=('Quicksand', 12, 'bold'), bg='white').pack(side=tk.LEFT, padx=(10, 5))
         self.data_fim = DateEntry(
             filter_frame,
             font=('Quicksand', 9),
@@ -185,7 +187,7 @@ class SolicitacoesAppPro:
         self.data_fim.pack(side=tk.LEFT, padx=(0, 20))
         
         # Atalhos de data
-        tk.Label(filter_frame, text="Atalhos:", font=('Quicksand', 9), bg='white').pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(filter_frame, text="Atalhos:", font=('Quicksand', 11, 'bold'), bg='white').pack(side=tk.LEFT, padx=(0, 5))
         
         ctk.CTkButton(
             filter_frame,
@@ -194,10 +196,11 @@ class SolicitacoesAppPro:
             fg_color='#9b59b6',
             hover_color='#8e44ad',
             text_color='white',
-            font=('Quicksand', 8, 'bold'),
+            font=('Quicksand', 10, 'bold'),
             cursor='hand2',
             corner_radius=6,
-            width=70
+            width=80,
+            height=32
         ).pack(side=tk.LEFT, padx=2)
         
         ctk.CTkButton(
@@ -207,10 +210,11 @@ class SolicitacoesAppPro:
             fg_color='#9b59b6',
             hover_color='#8e44ad',
             text_color='white',
-            font=('Quicksand', 8, 'bold'),
+            font=('Quicksand', 10, 'bold'),
             cursor='hand2',
             corner_radius=6,
-            width=70
+            width=80,
+            height=32
         ).pack(side=tk.LEFT, padx=2)
         
         ctk.CTkButton(
@@ -220,10 +224,11 @@ class SolicitacoesAppPro:
             fg_color='#9b59b6',
             hover_color='#8e44ad',
             text_color='white',
-            font=('Quicksand', 8, 'bold'),
+            font=('Quicksand', 10, 'bold'),
             cursor='hand2',
             corner_radius=6,
-            width=70
+            width=80,
+            height=32
         ).pack(side=tk.LEFT, padx=(2, 20))
         
         ctk.CTkButton(
@@ -233,10 +238,11 @@ class SolicitacoesAppPro:
             fg_color='#e67e22',
             hover_color='#d35400',
             text_color='white',
-            font=('Quicksand', 9, 'bold'),
+            font=('Quicksand', 11, 'bold'),
             cursor='hand2',
             corner_radius=8,
-            width=140
+            width=150,
+            height=36
         ).pack(side=tk.LEFT, padx=(0, 10))
         
         ctk.CTkButton(
@@ -246,10 +252,11 @@ class SolicitacoesAppPro:
             fg_color='#95a5a6',
             hover_color='#7f8c8d',
             text_color='white',
-            font=('Quicksand', 9, 'bold'),
+            font=('Quicksand', 11, 'bold'),
             cursor='hand2',
             corner_radius=8,
-            width=140
+            width=150,
+            height=36
         ).pack(side=tk.LEFT)
         
         # ========== SISTEMA DE ABAS ==========
