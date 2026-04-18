@@ -13,6 +13,79 @@ import sys
 import json
 
 
+class Toast:
+    """Sistema de notificações toast modernas"""
+    
+    @staticmethod
+    def show(parent, message, tipo='info', duration=3000):
+        """
+        Mostra uma notificação toast
+        
+        Args:
+            parent: Widget pai (root)
+            message: Mensagem a exibir
+            tipo: 'success', 'error', 'warning', 'info'
+            duration: Duração em ms (padrão 3000)
+        """
+        # Cores por tipo
+        cores = {
+            'success': {'bg': '#27ae60', 'fg': 'white', 'icon': '✅'},
+            'error': {'bg': '#e74c3c', 'fg': 'white', 'icon': '❌'},
+            'warning': {'bg': '#e67e22', 'fg': 'white', 'icon': '⚠️'},
+            'info': {'bg': '#3498db', 'fg': 'white', 'icon': 'ℹ️'}
+        }
+        
+        cor = cores.get(tipo, cores['info'])
+        
+        # Criar janela toast
+        toast = tk.Toplevel(parent)
+        toast.overrideredirect(True)  # Sem borda
+        toast.attributes('-topmost', True)  # Sempre no topo
+        
+        # Frame do toast
+        frame = tk.Frame(
+            toast,
+            bg=cor['bg'],
+            relief=tk.RAISED,
+            borderwidth=3
+        )
+        frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        
+        # Label com mensagem
+        label = tk.Label(
+            frame,
+            text=f"{cor['icon']}  {message}",
+            font=('Quicksand', 11, 'bold'),
+            bg=cor['bg'],
+            fg=cor['fg'],
+            padx=20,
+            pady=12
+        )
+        label.pack()
+        
+        # Posicionar no canto superior direito
+        toast.update_idletasks()
+        width = toast.winfo_width()
+        height = toast.winfo_height()
+        x = parent.winfo_x() + parent.winfo_width() - width - 20
+        y = parent.winfo_y() + 80
+        toast.geometry(f'+{x}+{y}')
+        
+        # Animação de fade out e destruir
+        def fade_out(alpha=1.0):
+            if alpha > 0:
+                alpha -= 0.05
+                toast.attributes('-alpha', alpha)
+                toast.after(50, lambda: fade_out(alpha))
+            else:
+                toast.destroy()
+        
+        # Agendar fade out
+        toast.after(duration, fade_out)
+        
+        return toast
+
+
 def _registrar_fontes():
     """Registra as fontes empacotadas via PyInstaller antes de abrir a janela."""
     # Quando empacotado pelo PyInstaller, arquivos de dados ficam em sys._MEIPASS
@@ -860,11 +933,12 @@ class SolicitacoesAppPro:
             self.root.update()
             self.root.after(500, self.progress_bar.pack_forget)  # Esconder após 500ms
             
-            messagebox.showinfo(
-                "Sucesso",
-                f"✅ Dados carregados com sucesso!\n\n"
-                f"Total original: {len(df)} linhas\n"
-                f"Após filtros: {len(self.df_filtrado)} linhas"
+            # Toast de sucesso
+            Toast.show(
+                self.root,
+                f"Dados carregados! {len(self.df_original)} registros prontos",
+                tipo='success',
+                duration=3000
             )
             
         except FileNotFoundError:
@@ -1022,11 +1096,12 @@ class SolicitacoesAppPro:
                 fg='white'
             )
             
-            messagebox.showinfo(
-                "Filtro Aplicado",
-                f"✅ Filtro de data aplicado!\n\n"
-                f"Período: {data_inicio.strftime('%d/%m/%Y')} até {data_fim.strftime('%d/%m/%Y')}\n"
-                f"Solicitações encontradas: {df_filtrado_data['Numero SA'].nunique()}"
+            # Toast de sucesso
+            Toast.show(
+                self.root,
+                f"Filtro aplicado: {len(self.df_filtrado)} registros encontrados",
+                tipo='success',
+                duration=3000
             )
             
         except Exception as e:
@@ -1067,7 +1142,13 @@ class SolicitacoesAppPro:
         # Remover badge de filtro
         self.filtro_badge.config(text="", bg='white')
         
-        messagebox.showinfo("Filtro Limpo", "✅ Filtro de data removido. Exibindo todos os dados.")
+        # Toast de info
+        Toast.show(
+            self.root,
+            "Filtro removido. Exibindo todos os dados",
+            tipo='info',
+            duration=2500
+        )
     
     # ==================== ATUALIZAR DASHBOARD ====================
     def atualizar_dashboard(self):
@@ -1558,7 +1639,12 @@ DBSolutions Lab - © 2026
         if filename:
             try:
                 self.df_status_filtrado.to_excel(filename, index=False, sheet_name='Status Atendimento')
-                messagebox.showinfo("Sucesso", f"✅ Dados exportados com sucesso!\n\nArquivo: {filename}")
+                Toast.show(
+                    self.root,
+                    "Dados exportados com sucesso!",
+                    tipo='success',
+                    duration=3000
+                )
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
     
@@ -1581,11 +1667,11 @@ DBSolutions Lab - © 2026
                 
                 df_export.to_excel(filename, index=False, sheet_name='Solicitações')
                 
-                messagebox.showinfo(
-                    "Sucesso",
-                    f"✅ Arquivo exportado com sucesso!\n\n"
-                    f"Local: {filename}\n"
-                    f"Registros: {len(df_export)}"
+                Toast.show(
+                    self.root,
+                    f"Excel exportado! {len(df_export)} registros salvos",
+                    tipo='success',
+                    duration=3000
                 )
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
@@ -1630,10 +1716,11 @@ DBSolutions Lab - © 2026
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(self.resumo_text.get('1.0', tk.END))
                 
-                messagebox.showinfo(
-                    "Sucesso",
-                    f"✅ Resumo exportado com sucesso!\n\n"
-                    f"Local: {filename}"
+                Toast.show(
+                    self.root,
+                    "Resumo exportado com sucesso!",
+                    tipo='success',
+                    duration=3000
                 )
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
