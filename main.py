@@ -10,6 +10,7 @@ import customtkinter as ctk
 import ctypes
 import os
 import sys
+import json
 
 
 def _registrar_fontes():
@@ -42,6 +43,10 @@ class SolicitacoesAppPro:
         self.filtro_data_inicio = None
         self.filtro_data_fim = None
         self.progress_bar = None
+        
+        # Configurações
+        self.config_file = 'config.json'
+        self.config = self.carregar_config()
         
         self.criar_interface()
         
@@ -118,7 +123,7 @@ class SolicitacoesAppPro:
             corner_radius=8,
             border_width=2
         )
-        self.arquivo_entry.insert(0, 'simecr05.xlsx')
+        self.arquivo_entry.insert(0, self.config.get('ultimo_arquivo', 'simecr05.xlsx'))
         self.arquivo_entry.pack(side=tk.LEFT, padx=(0, 10))
         
         ctk.CTkButton(
@@ -739,6 +744,10 @@ class SolicitacoesAppPro:
         if not arquivo:
             messagebox.showwarning("Aviso", "Por favor, selecione um arquivo!")
             return
+        
+        # Salvar último arquivo usado
+        self.config['ultimo_arquivo'] = arquivo
+        self.salvar_config()
         
         # Mostrar loading state com progress bar
         self.info_label.config(
@@ -1568,6 +1577,30 @@ DBSolutions Lab - © 2026
                 )
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
+    
+    def carregar_config(self):
+        """Carrega configurações do arquivo JSON"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Erro ao carregar config: {e}")
+        
+        # Configuração padrão
+        return {
+            'ultimo_arquivo': 'simecr05.xlsx',
+            'tema': 'light',
+            'versao': '1.0.0'
+        }
+    
+    def salvar_config(self):
+        """Salva configurações no arquivo JSON"""
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Erro ao salvar config: {e}")
     
     def exportar_resumo(self):
         if self.df_filtrado is None or self.df_filtrado.empty:
