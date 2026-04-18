@@ -43,14 +43,6 @@ class SolicitacoesAppPro:
         self.filtro_data_fim = None
         self.progress_bar = None
         
-        # Cores dinâmicas para tema
-        self.cores = {
-            'bg_principal': '#f0f0f0',
-            'bg_frame': 'white',
-            'texto_normal': '#2c3e50',
-            'texto_secundario': '#7f8c8d'
-        }
-        
         self.criar_interface()
         
     def criar_interface(self):
@@ -62,19 +54,6 @@ class SolicitacoesAppPro:
         header_frame = tk.Frame(main_frame, bg='#2c3e50', height=60)
         header_frame.pack(fill=tk.X, pady=(0, 10))
         header_frame.pack_propagate(False)
-        
-        # Switch de tema (canto direito)
-        self.theme_switch = ctk.CTkSwitch(
-            header_frame,
-            text="� Tema Escuro",
-            command=self.alternar_tema,
-            font=('Quicksand', 10, 'bold'),
-            fg_color='#FFD700',
-            progress_color='#2c3e50',
-            button_color='#FFD700',
-            button_hover_color='#f39c12'
-        )
-        self.theme_switch.place(relx=0.95, rely=0.5, anchor='e')
         
         # Container centralizado para título e subtítulo lado a lado
         header_content = tk.Frame(header_frame, bg='#2c3e50')
@@ -1583,40 +1562,6 @@ DBSolutions Lab - © 2026
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao exportar:\n{str(e)}")
     
-    def alternar_tema(self):
-        """Alternar entre tema claro e escuro"""
-        modo_atual = ctk.get_appearance_mode()
-        
-        if modo_atual == "Light":
-            ctk.set_appearance_mode("dark")
-            # Cores para modo escuro
-            self.cores['bg_principal'] = '#1e1e1e'
-            self.cores['bg_frame'] = '#2b2b2b'
-            self.cores['texto_normal'] = '#ffffff'
-            self.cores['texto_secundario'] = '#b0b0b0'
-            bg_tabela = '#2b2b2b'
-            fg_tabela = '#ffffff'
-        else:
-            ctk.set_appearance_mode("light")
-            # Cores para modo claro
-            self.cores['bg_principal'] = '#f0f0f0'
-            self.cores['bg_frame'] = 'white'
-            self.cores['texto_normal'] = '#2c3e50'
-            self.cores['texto_secundario'] = '#7f8c8d'
-            bg_tabela = 'white'
-            fg_tabela = 'black'
-        
-        # Atualizar cores da interface
-        self.root.configure(bg=self.cores['bg_principal'])
-        
-        # Atualizar abas
-        if hasattr(self, 'aba_dados'):
-            self.aba_dados.configure(bg=self.cores['bg_frame'])
-        if hasattr(self, 'aba_status'):
-            self.aba_status.configure(bg=self.cores['bg_frame'])
-        if hasattr(self, 'aba_resumo'):
-            self.aba_resumo.configure(bg=self.cores['bg_frame'])
-    
     def exportar_resumo(self):
         if self.df_filtrado is None or self.df_filtrado.empty:
             messagebox.showwarning("Aviso", "Não há dados para exportar!")
@@ -1645,8 +1590,8 @@ if __name__ == "__main__":
     _registrar_fontes()
     
     # Configurar tema do CustomTkinter
-    ctk.set_appearance_mode("system")  # Modes: "light", "dark", "system"
-    ctk.set_default_color_theme("blue")  # Themes: "blue", "green", "dark-blue"
+    ctk.set_appearance_mode("light")  # Modo claro fixo
+    ctk.set_default_color_theme("blue")  # Tema azul
     
     root = ctk.CTk()  # Usar CTk ao invés de tk.Tk()
     app = SolicitacoesAppPro(root)
