@@ -109,7 +109,7 @@ def _registrar_fontes():
 class SolicitacoesAppPro:
     def __init__(self, root):
         self.root = root
-        self.root.title("⚡ Zeus - Sistema Elizeus de Controle de Solicitações")
+        self.root.title("⚡ Zeus - Sistema de Controle de Solicitações")
         self.root.geometry("1600x900")
         self.root.configure(bg='#f0f0f0')
         
@@ -187,7 +187,7 @@ class SolicitacoesAppPro:
         # Subtítulo
         subtitle_label = tk.Label(
             header_content,
-            text='Sistema Elizeus de Controle de Solicitações',
+            text='Sistema de Controle de Solicitações',
             font=('Quicksand', 14, 'bold'),
             bg='#2c3e50',
             fg='#ecf0f1'  # Branco suave
@@ -294,54 +294,29 @@ class SolicitacoesAppPro:
         # Atalhos de data
         tk.Label(filter_frame, text="Atalhos:", font=('Quicksand', 13, 'bold'), bg='white').pack(side=tk.LEFT, padx=(0, 5))
         
-        ctk.CTkButton(
-            filter_frame,
-            text="Hoje",
-            command=lambda: self.aplicar_atalho_data('hoje'),
-            fg_color='#9b59b6',
-            hover_color='#8e44ad',
-            text_color='white',
-            font=('Quicksand', 11, 'bold'),
-            cursor='hand2',
-            corner_radius=6,
-            width=80,
-            height=32
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ctk.CTkButton(
-            filter_frame,
-            text="Semana",
-            command=lambda: self.aplicar_atalho_data('semana'),
-            fg_color='#9b59b6',
-            hover_color='#8e44ad',
-            text_color='white',
-            font=('Quicksand', 11, 'bold'),
-            cursor='hand2',
-            corner_radius=6,
-            width=80,
-            height=32
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ctk.CTkButton(
-            filter_frame,
-            text="Mês",
-            command=lambda: self.aplicar_atalho_data('mes'),
-            fg_color='#9b59b6',
-            hover_color='#8e44ad',
-            text_color='white',
-            font=('Quicksand', 11, 'bold'),
-            cursor='hand2',
-            corner_radius=6,
-            width=80,
-            height=32
-        ).pack(side=tk.LEFT, padx=(2, 20))
-        
+        for texto, tipo in [("Hoje", 'hoje'), ("Semana", 'semana'), ("Mês", 'mes')]:
+            ctk.CTkButton(
+                filter_frame,
+                text=texto,
+                command=lambda t=tipo: self.aplicar_atalho_data(t),
+                fg_color='#5d6d7e',
+                hover_color='#4a5968',
+                text_color='white',
+                font=('Quicksand', 11, 'bold'),
+                cursor='hand2',
+                corner_radius=6,
+                width=80,
+                height=32
+            ).pack(side=tk.LEFT, padx=2)
+
+        tk.Frame(filter_frame, width=18, bg='white').pack(side=tk.LEFT)
+
         ctk.CTkButton(
             filter_frame,
             text="🔍 Aplicar Filtro",
             command=self.aplicar_filtro_data,
-            fg_color='#e67e22',
-            hover_color='#d35400',
+            fg_color='#3498db',
+            hover_color='#2980b9',
             text_color='white',
             font=('Quicksand', 12, 'bold'),
             cursor='hand2',
@@ -864,9 +839,13 @@ class SolicitacoesAppPro:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=self.dashboard_frame, anchor="nw")
+        self._dashboard_canvas_window = canvas.create_window((0, 0), window=self.dashboard_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(
+            self._dashboard_canvas_window, width=e.width
+        ))
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
@@ -894,9 +873,14 @@ class SolicitacoesAppPro:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=self.analise_frame, anchor="nw")
+        self._analise_canvas_window = canvas.create_window((0, 0), window=self.analise_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-        
+
+        # Expande o frame interno para ocupar toda a largura do canvas
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(
+            self._analise_canvas_window, width=e.width
+        ))
+
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
@@ -944,25 +928,51 @@ class SolicitacoesAppPro:
             width=220
         ).pack(side=tk.RIGHT, padx=(0, 10))
         
-        # Área de texto com scroll
-        text_frame = tk.Frame(self.aba_resumo, bg='white')
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-        
+        # Layout em 2 colunas: texto (esq) + painel KPIs (dir)
+        body_frame = tk.Frame(self.aba_resumo, bg='#fdecea')
+        body_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # Coluna esquerda — container que centraliza o texto
+        text_outer = tk.Frame(body_frame, bg='#fdecea')
+        text_outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 5))
+
+        # Wrapper centralizado: fill=tk.Y + expand=True sem fill=tk.X → centraliza horizontal
+        text_frame = tk.Frame(text_outer, bg='white')
+        text_frame.pack(expand=True, fill=tk.Y)
+
         scroll_resumo = ttk.Scrollbar(text_frame)
         scroll_resumo.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         self.resumo_text = tk.Text(
             text_frame,
             font=('Consolas', 10),
             bg='#f8f9fa',
             fg='#2c3e50',
+            width=84,
             yscrollcommand=scroll_resumo.set,
-            wrap=tk.WORD,
+            wrap=tk.NONE,
             padx=20,
             pady=20
         )
-        self.resumo_text.pack(fill=tk.BOTH, expand=True)
+        self.resumo_text.pack(side=tk.LEFT, fill=tk.Y, expand=True)
         scroll_resumo.config(command=self.resumo_text.yview)
+
+        # Coluna direita — painel de destaques
+        self.resumo_sidebar = tk.Frame(body_frame, bg='#fdecea', width=440)
+        self.resumo_sidebar.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 10), pady=0)
+        self.resumo_sidebar.pack_propagate(False)
+
+        tk.Label(
+            self.resumo_sidebar,
+            text="Destaques",
+            font=('Quicksand', 13, 'bold'),
+            bg='#fdecea',
+            fg='#2c3e50'
+        ).pack(pady=(10, 8))
+
+        # Placeholder para os cards de destaque (populados em atualizar_resumo)
+        self.resumo_sidebar_content = tk.Frame(self.resumo_sidebar, bg='#fdecea')
+        self.resumo_sidebar_content.pack(fill=tk.BOTH, expand=True, padx=8)
         
         self.resumo_text.insert('1.0', "📄 Resumo Executivo será gerado após carregar os dados")
         self.resumo_text.config(state=tk.DISABLED)
@@ -1405,11 +1415,7 @@ class SolicitacoesAppPro:
 
             self.tree.insert('', tk.END, values=valores)
 
-        self.info_label.config(
-            text=f"📊 Exibindo {df['Numero SA'].nunique()} solicitações | "
-                 f"Quantidade total de itens: {len(df)}",
-            fg='#27ae60'
-        )
+        self.info_label.config(text="✅ Dados carregados", fg='#27ae60')
     
     def aplicar_atalho_data(self, tipo):
         """Aplicar atalhos de data (Hoje, Semana, Mês)"""
@@ -1652,7 +1658,7 @@ class SolicitacoesAppPro:
             bg='white'
         ).pack(pady=10)
         
-        fig = Figure(figsize=(7, 4), dpi=100)
+        fig = Figure(figsize=(7, 4.5), dpi=100)
         ax = fig.add_subplot(111)
         
         df = self.df_filtrado
@@ -1684,7 +1690,7 @@ class SolicitacoesAppPro:
             bg='white'
         ).pack(pady=10)
         
-        fig = Figure(figsize=(7, 4), dpi=100)
+        fig = Figure(figsize=(7, 4.5), dpi=100)
         ax = fig.add_subplot(111)
         
         df = self.df_filtrado
@@ -1722,20 +1728,29 @@ class SolicitacoesAppPro:
             return
         
         df = self.df_filtrado
-        
-        # Título
-        tk.Label(
+
+        # Faixa de título (padrão das outras abas)
+        title_frame = ctk.CTkFrame(
             self.analise_frame,
-            text="📊 Análise Detalhada",
+            corner_radius=10,
+            height=60,
+            fg_color='#2c3e50'
+        )
+        title_frame.pack(fill=tk.X, padx=10, pady=(10, 10))
+        title_frame.pack_propagate(False)
+
+        tk.Label(
+            title_frame,
+            text="📈 Análise Detalhada",
             font=('Quicksand', 18, 'bold'),
-            bg='#f4ecf7',
-            fg='#2c3e50'
-        ).pack(pady=20)
-        
-        # Apenas 1 gráfico: Distribuição por Dia da Semana
+            bg='#2c3e50',
+            fg='#FFD700'
+        ).pack(expand=True)
+
+        # Gráfico: Distribuição por Dia da Semana
         graficos_frame = tk.Frame(self.analise_frame, bg='#f4ecf7')
-        graficos_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-        
+        graficos_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 20))
+
         self.criar_grafico_dias_semana(graficos_frame).pack(fill=tk.BOTH, expand=True)
     
     def criar_grafico_dias_semana(self, parent):
@@ -1748,7 +1763,7 @@ class SolicitacoesAppPro:
             bg='white'
         ).pack(pady=10)
         
-        fig = Figure(figsize=(12, 4), dpi=100)
+        fig = Figure(figsize=(12, 5), dpi=100)
         ax = fig.add_subplot(111)
         
         # Usa cópia local para não mutar self.df_filtrado com a coluna auxiliar
@@ -1763,8 +1778,7 @@ class SolicitacoesAppPro:
             sas_unicas = df[df['Dia Semana'] == dia]['Numero SA'].nunique()
             valores.append(sas_unicas)
         
-        colors = ['#3498db', '#27ae60', '#e67e22', '#9b59b6', '#e74c3c', '#1abc9c', '#f39c12']
-        ax.bar(dias_pt, valores, color=colors, width=0.6)
+        ax.bar(dias_pt, valores, color='#9b59b6', width=0.6)
         ax.set_ylabel('Número de Solicitações', fontsize=14, fontweight='bold')
         ax.set_xlabel('Dia da Semana', fontsize=14, fontweight='bold')
         ax.tick_params(axis='both', labelsize=12)
@@ -1887,7 +1901,71 @@ DBSolutions Lab - © 2026
         
         self.resumo_text.insert('1.0', resumo)
         self.resumo_text.config(state=tk.DISABLED)
-    
+
+        self._atualizar_resumo_sidebar(df, data_inicio_str, data_fim_str, dias_uteis)
+
+    def _atualizar_resumo_sidebar(self, df, data_inicio_str, data_fim_str, dias_uteis):
+        """Popula o painel lateral de destaques do Resumo Executivo."""
+        for w in self.resumo_sidebar_content.winfo_children():
+            w.destroy()
+
+        def card(titulo, valor, cor):
+            f = tk.Frame(self.resumo_sidebar_content, bg=cor, padx=8, pady=4)
+            f.pack(fill=tk.X, pady=2)
+            row = tk.Frame(f, bg=cor)
+            row.pack(fill=tk.X)
+            tk.Label(row, text=titulo, font=('Quicksand', 8, 'bold'),
+                     bg=cor, fg='white').pack(side=tk.LEFT)
+            tk.Label(row, text=str(valor), font=('Quicksand', 13, 'bold'),
+                     bg=cor, fg='white').pack(side=tk.RIGHT)
+
+        # Período analisado
+        f_periodo = tk.Frame(self.resumo_sidebar_content, bg='#2c3e50', padx=8, pady=5)
+        f_periodo.pack(fill=tk.X, pady=(0, 4))
+        row_p = tk.Frame(f_periodo, bg='#2c3e50')
+        row_p.pack(fill=tk.X)
+        tk.Label(row_p, text="Período", font=('Quicksand', 8, 'bold'),
+                 bg='#2c3e50', fg='#FFD700').pack(side=tk.LEFT)
+        tk.Label(f_periodo, text=f"{data_inicio_str} → {data_fim_str}",
+                 font=('Quicksand', 8), bg='#2c3e50', fg='white').pack(anchor='w')
+
+        card("Total de SAs",   f"{df['Numero SA'].nunique():,}", '#3498db')
+        card("Total de Itens", f"{len(df):,}",                  '#27ae60')
+        card("Setores Ativos", f"{df['Setor'].nunique():,}",    '#e67e22')
+        card("Solicitantes",   f"{df['Solicitante'].nunique():,}", '#9b59b6')
+        card("Dias Úteis",     f"{dias_uteis}",                 '#1abc9c')
+
+        # Separador
+        tk.Frame(self.resumo_sidebar_content, bg='#ddd', height=1).pack(fill=tk.X, pady=(6, 4))
+
+        tk.Label(self.resumo_sidebar_content, text="Top 3 Setores",
+                 font=('Quicksand', 9, 'bold'), bg='#fdecea', fg='#2c3e50').pack(anchor='w', pady=(0, 2))
+
+        for i, (setor, qtd) in enumerate(df['Setor'].value_counts().head(3).items(), 1):
+            f = tk.Frame(self.resumo_sidebar_content, bg='white', padx=6, pady=3)
+            f.pack(fill=tk.X, pady=1)
+            row = tk.Frame(f, bg='white')
+            row.pack(fill=tk.X)
+            tk.Label(row, text=f"{i}. {setor[:22]}", font=('Quicksand', 8, 'bold'),
+                     bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+            tk.Label(row, text=f"{qtd}",  font=('Quicksand', 8),
+                     bg='white', fg='#7f8c8d').pack(side=tk.RIGHT)
+
+        tk.Frame(self.resumo_sidebar_content, bg='#ddd', height=1).pack(fill=tk.X, pady=(6, 4))
+
+        tk.Label(self.resumo_sidebar_content, text="Top 3 Solicitantes",
+                 font=('Quicksand', 9, 'bold'), bg='#fdecea', fg='#2c3e50').pack(anchor='w', pady=(0, 2))
+
+        for i, (sol, qtd) in enumerate(df['Solicitante'].value_counts().head(3).items(), 1):
+            f = tk.Frame(self.resumo_sidebar_content, bg='white', padx=6, pady=3)
+            f.pack(fill=tk.X, pady=1)
+            row = tk.Frame(f, bg='white')
+            row.pack(fill=tk.X)
+            tk.Label(row, text=f"{i}. {sol[:22]}", font=('Quicksand', 8, 'bold'),
+                     bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+            tk.Label(row, text=f"{qtd} SAs", font=('Quicksand', 8),
+                     bg='white', fg='#7f8c8d').pack(side=tk.RIGHT)
+
     # ==================== BUSCA RÁPIDA ====================
     def filtrar_tabela_busca(self):
         self._refresh_tabela_dados()
@@ -1979,10 +2057,7 @@ DBSolutions Lab - © 2026
         perc_parciais = (parciais / total * 100) if total > 0 else 0
         perc_nao_atendidas = (nao_atendidas / total * 100) if total > 0 else 0
         
-        self.status_info_label.config(
-            text=f"📊 Exibindo {df['Numero SA'].nunique()} solicitações | {total} itens",
-            fg='#27ae60'
-        )
+        self.status_info_label.config(text="✅ Dados carregados", fg='#27ae60')
         
         self.kpi_atendidas.config(text=f"✅ Atendidas: {atendidas} ({perc_atendidas:.1f}%)")
         self.kpi_parciais.config(text=f"⚠️ Parciais: {parciais} ({perc_parciais:.1f}%)")
