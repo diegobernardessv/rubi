@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 import pandas as pd
+import numpy as np
 from tkcalendar import DateEntry
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -11,7 +12,6 @@ import ctypes
 import os
 import sys
 import json
-import pickle
 import hashlib
 
 
@@ -135,8 +135,12 @@ class SolicitacoesAppPro:
         self._combo_setor_status       = None
         self._combo_solicitante_status = None
         
+        # Diretório de dados do app em %APPDATA% — funciona tanto em dev quanto no .exe
+        _app_data = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'ZeusApp')
+        os.makedirs(_app_data, exist_ok=True)
+
         # Configurações
-        self.config_file = 'config.json'
+        self.config_file = os.path.join(_app_data, 'config.json')
         self.config = self.carregar_config()
 
         # Jobs de debounce para salvar larguras de colunas
@@ -144,9 +148,8 @@ class SolicitacoesAppPro:
         self._save_widths_job_status = None
 
         # Cache
-        self.cache_dir = '.cache'
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+        self.cache_dir = os.path.join(_app_data, '.cache')
+        os.makedirs(self.cache_dir, exist_ok=True)
         
         self.criar_interface()
         
@@ -1154,17 +1157,20 @@ class SolicitacoesAppPro:
             self.arquivo_entry.insert(0, filename)
     
     def carregar_dados(self):
-        arquivo = self.arquivo_entry.get()
-        
+        arquivo = self.arquivo_entry.get().strip()
+
         if not arquivo:
-            Toast.show(
-                self.root,
-                "Selecione um arquivo Excel primeiro",
-                tipo='warning',
-                duration=3000
-            )
+            Toast.show(self.root, "Selecione um arquivo Excel primeiro", tipo='warning', duration=3000)
             return
-        
+
+        if os.path.splitext(arquivo)[1].lower() not in ('.xlsx', '.xls'):
+            Toast.show(self.root, "Selecione um arquivo Excel válido (.xlsx ou .xls)", tipo='warning', duration=3000)
+            return
+
+        if not os.path.isfile(arquivo):
+            Toast.show(self.root, f"Arquivo não encontrado: {os.path.basename(arquivo)}", tipo='error', duration=4000)
+            return
+
         # Salvar último arquivo usado
         self.config['ultimo_arquivo'] = arquivo
         self.salvar_config()
@@ -1195,7 +1201,7 @@ class SolicitacoesAppPro:
                 df = pd.read_excel(arquivo, sheet_name='Relatório de Controle de entr')
                 self.progress_bar.set(0.2)
                 self.root.update()
-                
+
                 # Excluir apenas grupos (df_original = base para Dashboard/Análise/Resumo)
                 grupos_excluir = [4003, 4037]
                 df_base = df[~df['Grupo'].isin(grupos_excluir)]
@@ -1218,6 +1224,7 @@ class SolicitacoesAppPro:
             }
             
                 # Mapeamento adicional para aba Status de Atendimento
+                # 'Atendimento' foi removido — é derivado de Quantidade vs Qtd. Atendida
                 colunas_status_mapeamento = {
                     'Numero SA': 'Numero SA',
                     'Codigo': 'Codigo',
@@ -1226,7 +1233,7 @@ class SolicitacoesAppPro:
                     'Armazem': 'Armazem',
                     'Quantidade': 'Quantidade Solicitada',
                     'Qtd. Atendida': 'Qtd. Atendida',
-                    'Atendimento': 'Atendimento',
+                    'Status': 'Status',
                     'Dt. Emissao': 'Data Emissao',
                     'Dt. Atendido': 'Dt. Atendido',
                     'Setor': 'Setor',
@@ -1236,16 +1243,58 @@ class SolicitacoesAppPro:
                 }
 
                 # Criar df_base para abas normais
-                df_base = df_base[list(colunas_mapeamento.keys())]
+                # Seleciona apenas colunas que existem no arquivo (tolerante a relatórios com estrutura diferente)
+                colunas_base_presentes = [c for c in colunas_mapeamento.keys() if c in df_base.columns]
+                ausentes_base = set(colunas_mapeamento.keys()) - set(colunas_base_presentes)
+                if ausentes_base:
+                    print(f"Aviso: colunas ausentes na aba Dados: {ausentes_base}")
+                df_base = df_base[colunas_base_presentes]
                 df_base = df_base.rename(columns=colunas_mapeamento)
+                # Garante que colunas ausentes existam como vazias
+                for col_orig, col_dest in colunas_mapeamento.items():
+                    if col_dest not in df_base.columns:
+                        df_base[col_dest] = None
                 df_base['Data Emissao'] = pd.to_datetime(df_base['Data Emissao'], errors='coerce')
 
                 # Criar df_status_base para aba Status de Atendimento
                 df_status_base = df[~df['Grupo'].isin(grupos_excluir)]
-                df_status_base = df_status_base[list(colunas_status_mapeamento.keys())]
+                # Seleciona apenas colunas que existem no arquivo
+                colunas_status_presentes = [c for c in colunas_status_mapeamento.keys() if c in df_status_base.columns]
+                ausentes_status = set(colunas_status_mapeamento.keys()) - set(colunas_status_presentes)
+                if ausentes_status:
+                    print(f"Aviso: colunas ausentes na aba Status: {ausentes_status}")
+                df_status_base = df_status_base[colunas_status_presentes]
                 df_status_base = df_status_base.rename(columns=colunas_status_mapeamento)
+                # Garante que colunas ausentes existam como vazias
+                for col_orig, col_dest in colunas_status_mapeamento.items():
+                    if col_dest not in df_status_base.columns:
+                        df_status_base[col_dest] = None
                 df_status_base['Data Emissao'] = pd.to_datetime(df_status_base['Data Emissao'], errors='coerce')
                 df_status_base['Dt. Atendido'] = pd.to_datetime(df_status_base['Dt. Atendido'], errors='coerce')
+
+                # Deriva a coluna Atendimento:
+                # - Qtd. Atendida == Quantidade              → TOTALMENTE ATENDIDA
+                # - Qtd. Atendida < Quantidade e Ate > 0    → PARCIALMENTE ATENDIDA
+                # - Custo Total == 0 e Status != EM APROVAÇÃO → NÃO ATENDIDA
+                # - demais (EM APROVAÇÃO, PENDENTE sem custo etc.) → ""
+                qtd_sol   = pd.to_numeric(df_status_base['Quantidade Solicitada'], errors='coerce').fillna(0)
+                qtd_ate   = pd.to_numeric(df_status_base['Qtd. Atendida'],         errors='coerce').fillna(0)
+                custo_tot = pd.to_numeric(df_status_base['Custo Total'],            errors='coerce').fillna(0)
+                status_col = df_status_base['Status'] if 'Status' in df_status_base.columns else pd.Series('', index=df_status_base.index)
+
+                df_status_base['Atendimento'] = np.select(
+                    [
+                        qtd_ate == qtd_sol,
+                        (qtd_ate < qtd_sol) & (qtd_ate != 0),
+                        (custo_tot == 0) & (status_col != 'EM APROVAÇÃO'),
+                    ],
+                    [
+                        'TOTALMENTE ATENDIDA',
+                        'PARCIALMENTE ATENDIDA',
+                        'NÃO ATENDIDA',
+                    ],
+                    default=''
+                )
 
                 # df_original = TODOS os dados (sem grupos, mas COM todos os status)
                 self.df_original = df_base.copy()
@@ -1406,9 +1455,10 @@ class SolicitacoesAppPro:
                 elif col == 'Data Emissao' and isinstance(valor, pd.Timestamp):
                     valores.append(valor.strftime('%d/%m/%Y'))
                 elif col == 'Quantidade':
-                    if valor == int(valor):
-                        valores.append(str(int(valor)))
-                    else:
+                    try:
+                        int_val = int(valor)
+                        valores.append(str(int_val) if valor == int_val else str(valor))
+                    except (ValueError, OverflowError):
                         valores.append(str(valor))
                 else:
                     valores.append(str(valor))
@@ -1596,10 +1646,9 @@ class SolicitacoesAppPro:
         kpi_frame = tk.Frame(self.dashboard_frame, bg='#ecf0f1')
         kpi_frame.pack(fill=tk.X, padx=20, pady=20)
         
-        # Filtrar dados excluindo 'EM APROVAÇÃO' para os KPIs
-        df_kpi = df[df['Status'] != 'EM APROVAÇÃO'].copy() if 'Status' in df.columns else df.copy()
-        
-        # Total de Solicitações: SAs únicas (sem 'EM APROVAÇÃO')
+        df_kpi = df.copy()
+
+        # Total de Solicitações: SAs únicas
         total_sas = df_kpi['Numero SA'].nunique()
         
         # Total de Itens: Total de linhas (códigos) sem 'EM APROVAÇÃO'
@@ -1822,8 +1871,10 @@ class SolicitacoesAppPro:
                 data_atual += timedelta(days=1)
         else:
             # Sem filtro, usar min/max dos dados
-            data_inicio_str = df['Data Emissao'].min().strftime('%d/%m/%Y')
-            data_fim_str = df['Data Emissao'].max().strftime('%d/%m/%Y')
+            dt_min = df['Data Emissao'].min()
+            dt_max = df['Data Emissao'].max()
+            data_inicio_str = dt_min.strftime('%d/%m/%Y') if pd.notna(dt_min) else 'N/D'
+            data_fim_str    = dt_max.strftime('%d/%m/%Y') if pd.notna(dt_max) else 'N/D'
             
             # Calcular dias úteis baseado nas datas únicas nos dados
             from datetime import timedelta
@@ -2036,9 +2087,10 @@ DBSolutions Lab - © 2026
                 elif col in ['Data Emissao', 'Dt. Atendido'] and isinstance(valor, pd.Timestamp):
                     valores.append(valor.strftime('%d/%m/%Y'))
                 elif col in ['Quantidade Solicitada', 'Qtd. Atendida']:
-                    if valor == int(valor):
-                        valores.append(str(int(valor)))
-                    else:
+                    try:
+                        int_val = int(valor)
+                        valores.append(str(int_val) if valor == int_val else str(valor))
+                    except (ValueError, OverflowError):
                         valores.append(str(valor))
                 elif col in ['Custo Unitario', 'Custo Total']:
                     valores.append(f"R$ {valor:,.2f}" if not pd.isna(valor) else '')
@@ -2178,85 +2230,92 @@ DBSolutions Lab - © 2026
             return None
     
     def obter_cache_path(self, arquivo):
-        """Retorna o caminho do arquivo de cache"""
+        """Retorna o caminho base do cache (sem extensão — cada DataFrame tem seu sufixo)."""
         arquivo_hash = hashlib.md5(arquivo.encode()).hexdigest()
-        return os.path.join(self.cache_dir, f"{arquivo_hash}.pkl")
-    
+        return os.path.join(self.cache_dir, arquivo_hash)
+
     def carregar_do_cache(self, arquivo):
-        """Tenta carregar dados do cache"""
+        """Tenta carregar DataFrames do cache em formato parquet."""
         try:
-            cache_path = self.obter_cache_path(arquivo)
-            
-            if not os.path.exists(cache_path):
+            base = self.obter_cache_path(arquivo)
+            meta_path   = base + '.json'
+            df1_path    = base + '_original.parquet'
+            df2_path    = base + '_status.parquet'
+
+            if not all(os.path.exists(p) for p in (meta_path, df1_path, df2_path)):
                 return None
-            
-            # Verificar se o arquivo original foi modificado
+
             arquivo_hash = self.gerar_hash_arquivo(arquivo)
-            
-            with open(cache_path, 'rb') as f:
-                cache_data = pickle.load(f)
-            
-            # Verificar se o hash corresponde
-            if cache_data.get('hash') == arquivo_hash:
-                print(f"✅ Cache encontrado e válido para {arquivo}")
-                return cache_data.get('data')
-            else:
-                print(f"⚠️ Cache inválido (arquivo modificado)")
+
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+
+            if meta.get('hash') != arquivo_hash:
                 return None
-                
+
+            return {
+                'df_original':       pd.read_parquet(df1_path),
+                'df_status_original': pd.read_parquet(df2_path),
+            }
+
         except Exception as e:
             print(f"Erro ao carregar cache: {e}")
             return None
-    
+
     def salvar_no_cache(self, arquivo, data):
-        """Salva dados no cache"""
+        """Salva DataFrames no cache em formato parquet + metadados em JSON."""
         try:
-            cache_path = self.obter_cache_path(arquivo)
+            base = self.obter_cache_path(arquivo)
             arquivo_hash = self.gerar_hash_arquivo(arquivo)
-            
-            cache_data = {
-                'hash': arquivo_hash,
-                'data': data,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            with open(cache_path, 'wb') as f:
-                pickle.dump(cache_data, f)
-            
-            print(f"💾 Cache salvo para {arquivo}")
+
+            data['df_original'].to_parquet(base + '_original.parquet', index=False)
+            data['df_status_original'].to_parquet(base + '_status.parquet', index=False)
+
+            meta = {'hash': arquivo_hash, 'timestamp': datetime.now().isoformat()}
+            with open(base + '.json', 'w', encoding='utf-8') as f:
+                json.dump(meta, f)
+
             return True
-            
+
         except Exception as e:
             print(f"Erro ao salvar cache: {e}")
             return False
-    
+
     def limpar_cache(self):
-        """Remove todos os arquivos de cache"""
+        """Remove todos os arquivos de cache."""
         try:
             if os.path.exists(self.cache_dir):
                 for arquivo in os.listdir(self.cache_dir):
                     os.remove(os.path.join(self.cache_dir, arquivo))
-                print("🗑️ Cache limpo")
                 return True
         except Exception as e:
             print(f"Erro ao limpar cache: {e}")
             return False
     
     def carregar_config(self):
-        """Carrega configurações do arquivo JSON"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception as e:
-            print(f"Erro ao carregar config: {e}")
-        
-        # Configuração padrão
-        return {
-            'ultimo_arquivo': 'simecr05.xlsx',
+        """Carrega configurações do arquivo JSON com validação de tipos."""
+        defaults = {
+            'ultimo_arquivo': '',
             'tema': 'light',
             'versao': '1.0.0'
         }
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    dados = json.load(f)
+                if not isinstance(dados, dict):
+                    return defaults
+                # Larguras de colunas devem ser inteiros entre 10 e 2000
+                for chave in ('larguras_colunas', 'larguras_colunas_status'):
+                    if chave in dados and isinstance(dados[chave], dict):
+                        dados[chave] = {
+                            k: v for k, v in dados[chave].items()
+                            if isinstance(v, int) and 10 <= v <= 2000
+                        }
+                return {**defaults, **dados}
+        except Exception as e:
+            print(f"Erro ao carregar config: {e}")
+        return defaults
     
     def salvar_config(self):
         """Salva configurações no arquivo JSON"""
@@ -2344,7 +2403,7 @@ DBSolutions Lab - © 2026
         self.root.update()
 
         import tempfile
-        temp_files = []
+        temp_files = []  # acumulado progressivamente em _gerar_figuras_pdf para garantir limpeza
         try:
             df = self.df_filtrado
 
@@ -2366,8 +2425,8 @@ DBSolutions Lab - © 2026
             top_solicitantes = df['Solicitante'].value_counts().head(5)
             top_materiais    = df['Descricao'].value_counts().head(10)
 
-            # Gráficos como PNG temporários
-            temp_files = self._gerar_figuras_pdf()
+            # Gráficos como PNG temporários — passa temp_files para acumular progressivamente
+            self._gerar_figuras_pdf(temp_files)
 
             # Fontes (funciona em dev e no executável PyInstaller)
             if hasattr(sys, '_MEIPASS'):
@@ -2544,11 +2603,18 @@ DBSolutions Lab - © 2026
             align='C'
         )
 
-    def _gerar_figuras_pdf(self):
-        """Gera figuras matplotlib como PNG temporários para o PDF. Retorna lista de (titulo, path)."""
+    def _gerar_figuras_pdf(self, figuras: list):
+        """Gera figuras matplotlib como PNG temporários e acumula em `figuras` (titulo, path).
+        Recebe a lista por referência para que o finally do chamador possa limpar mesmo em erro parcial."""
         import tempfile
         df = self.df_filtrado
-        figuras = []
+
+        def _salvar_fig(fig, titulo):
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            fig.savefig(tmp.name, dpi=150, bbox_inches='tight')
+            plt.close(fig)
+            tmp.close()
+            figuras.append((titulo, tmp.name))
 
         # Top 10 Setores
         dados = df['Setor'].value_counts().head(10).sort_values(ascending=True)
@@ -2560,11 +2626,7 @@ DBSolutions Lab - © 2026
         ax.grid(True, alpha=0.3, axis='x')
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
         fig.tight_layout()
-        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-        fig.savefig(tmp.name, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        tmp.close()
-        figuras.append(("Top 10 Setores por Numero de Itens", tmp.name))
+        _salvar_fig(fig, "Top 10 Setores por Numero de Itens")
 
         # Top 10 Solicitantes
         dados = df['Solicitante'].value_counts().head(10).sort_values(ascending=True)
@@ -2576,11 +2638,7 @@ DBSolutions Lab - © 2026
         ax.grid(True, alpha=0.3, axis='x')
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
         fig.tight_layout()
-        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-        fig.savefig(tmp.name, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        tmp.close()
-        figuras.append(("Top 10 Solicitantes", tmp.name))
+        _salvar_fig(fig, "Top 10 Solicitantes")
 
         # Distribuição por dia da semana
         dias_map  = {0: 'Seg', 1: 'Ter', 2: 'Qua', 3: 'Qui', 4: 'Sex', 5: 'Sab', 6: 'Dom'}
@@ -2595,13 +2653,7 @@ DBSolutions Lab - © 2026
         ax.grid(True, alpha=0.3, axis='y')
         ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
         fig.tight_layout()
-        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-        fig.savefig(tmp.name, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        tmp.close()
-        figuras.append(("Distribuicao por Dia da Semana", tmp.name))
-
-        return figuras
+        _salvar_fig(fig, "Distribuicao por Dia da Semana")
 
 if __name__ == "__main__":
     _registrar_fontes()
