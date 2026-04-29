@@ -1052,7 +1052,7 @@ class SolicitacoesAppPro:
         if self.df_filtrado is None:
             return
 
-        status_excluir = ['EM APROVAÇÃO', 'PRE-REQUISIÇÃO GERADA']
+        status_excluir = ['EM APROVAÇÃO', 'EM APROVACAO', 'PRE-REQUISIÇÃO GERADA', 'PRE-REQUISICAO GERADA']
         df = self.df_filtrado[~self.df_filtrado['Status'].isin(status_excluir)].copy()
 
         armazem     = self.filtro_armazem_var.get()
@@ -1198,7 +1198,23 @@ class SolicitacoesAppPro:
                 self.root.update()
             else:
                 # Carregar do Excel (primeira vez ou arquivo modificado)
-                df = pd.read_excel(arquivo, sheet_name='Relatório de Controle de entr')
+                # Detecta automaticamente o nome da aba, pois varia entre usuários
+                _candidatos_aba = [
+                    '2-Relatório de Controle de entr',
+                    '2-Relatório de Controle de en',
+                    'Relatório de Controle de entr',
+                    'Relatório de Controle de en',
+                ]
+                with pd.ExcelFile(arquivo) as _xls:
+                    _aba = next(
+                        (c for c in _candidatos_aba if c in _xls.sheet_names),
+                        next((s for s in _xls.sheet_names if 'Controle de' in s), None)
+                    )
+                    if _aba is None:
+                        abas_disponiveis = ', '.join(_xls.sheet_names)
+                        Toast.show(self.root, f"Aba de dados não encontrada. Abas no arquivo: {abas_disponiveis}", tipo='error', duration=6000)
+                        return
+                df = pd.read_excel(arquivo, sheet_name=_aba)
                 self.progress_bar.set(0.2)
                 self.root.update()
 
@@ -1286,7 +1302,7 @@ class SolicitacoesAppPro:
                     [
                         qtd_ate == qtd_sol,
                         (qtd_ate < qtd_sol) & (qtd_ate != 0),
-                        (custo_tot == 0) & (status_col != 'EM APROVAÇÃO'),
+                        (custo_tot == 0) & (~status_col.isin(['EM APROVAÇÃO', 'EM APROVACAO'])),
                     ],
                     [
                         'TOTALMENTE ATENDIDA',
