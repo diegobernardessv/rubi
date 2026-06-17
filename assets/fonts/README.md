@@ -2,7 +2,7 @@
 
 ## Quicksand (Google Fonts)
 
-**Fonte principal do projeto ControladorSA**
+**Fonte principal do projeto Rubi**
 
 ### Sobre a Fonte
 
@@ -40,7 +40,7 @@ font=('Quicksand', 9)           # Texto pequeno
 
 ### Empacotamento
 
-As fontes são automaticamente empacotadas no executável via PyInstaller e registradas no Windows através da função `_registrar_fontes()` em `interface_sa_pro.py`.
+As fontes são automaticamente empacotadas no executável via PyInstaller e registradas no Windows através da função `_registrar_fontes()` em `main.py`.
 
 ### Licença
 

@@ -17,12 +17,12 @@ import hashlib
 
 class Toast:
     """Sistema de notificações toast modernas"""
-    
+
     @staticmethod
     def show(parent, message, tipo='info', duration=3000):
         """
         Mostra uma notificação toast
-        
+
         Args:
             parent: Widget pai (root)
             message: Mensagem a exibir
@@ -36,14 +36,14 @@ class Toast:
             'warning': {'bg': '#e67e22', 'fg': 'white', 'icon': '⚠️'},
             'info': {'bg': '#3498db', 'fg': 'white', 'icon': 'ℹ️'}
         }
-        
+
         cor = cores.get(tipo, cores['info'])
-        
+
         # Criar janela toast
         toast = tk.Toplevel(parent)
         toast.overrideredirect(True)  # Sem borda
         toast.attributes('-topmost', True)  # Sempre no topo
-        
+
         # Frame do toast
         frame = tk.Frame(
             toast,
@@ -52,7 +52,7 @@ class Toast:
             borderwidth=3
         )
         frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-        
+
         # Label com mensagem
         label = tk.Label(
             frame,
@@ -64,7 +64,7 @@ class Toast:
             pady=12
         )
         label.pack()
-        
+
         # Posicionar no canto superior direito
         toast.update_idletasks()
         width = toast.winfo_width()
@@ -72,7 +72,7 @@ class Toast:
         x = parent.winfo_x() + parent.winfo_width() - width - 20
         y = parent.winfo_y() + 80
         toast.geometry(f'+{x}+{y}')
-        
+
         # Animação de fade out e destruir
         def fade_out(alpha=1.0):
             if alpha > 0:
@@ -81,10 +81,10 @@ class Toast:
                 toast.after(50, lambda: fade_out(alpha))
             else:
                 toast.destroy()
-        
+
         # Agendar fade out
         toast.after(duration, fade_out)
-        
+
         return toast
 
 
@@ -121,7 +121,7 @@ class SolicitacoesAppPro:
         self.root.title("♦ Rubi - Sistema de Controle de Solicitações")
         self.root.geometry("1600x900")
         self.root.configure(bg='#f0f0f0')
-        
+
         self.df_original = None
         self.df_filtrado = None
         self.filtro_data_inicio = None
@@ -143,7 +143,7 @@ class SolicitacoesAppPro:
         self._combo_armazem_status     = None
         self._combo_setor_status       = None
         self._combo_solicitante_status = None
-        
+
         # Diretório de dados do app em %APPDATA% — funciona tanto em dev quanto no .exe
         _app_data = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'RubiApp')
         os.makedirs(_app_data, exist_ok=True)
@@ -159,23 +159,40 @@ class SolicitacoesAppPro:
         # Cache
         self.cache_dir = os.path.join(_app_data, '.cache')
         os.makedirs(self.cache_dir, exist_ok=True)
-        
+
+        # Remove cópias de trabalho residuais (caso o app tenha fechado durante
+        # uma atualização de período antes de apagá-las)
+        self._app_data = _app_data
+        self._limpar_copias_trabalho()
+
         self.criar_interface()
-        
+
+    def _limpar_copias_trabalho(self):
+        """Apaga cópias de trabalho (_rubi_work_*.xlsx) que tenham sobrado."""
+        try:
+            for nome in os.listdir(self._app_data):
+                if nome.startswith('_rubi_work_') and nome.lower().endswith('.xlsx'):
+                    try:
+                        os.remove(os.path.join(self._app_data, nome))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     def criar_interface(self):
         # Frame principal
         main_frame = tk.Frame(self.root, bg='#f0f0f0')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
         # ========== CABEÇALHO ==========
         header_frame = tk.Frame(main_frame, bg='#A4133C', height=52)
         header_frame.pack(fill=tk.X, pady=(0, 10))
         header_frame.pack_propagate(False)
-        
+
         # Container centralizado para título e subtítulo lado a lado
         header_content = tk.Frame(header_frame, bg='#A4133C')
         header_content.place(relx=0.5, rely=0.5, anchor='center')
-        
+
         # Título principal
         title_label = tk.Label(
             header_content,
@@ -185,7 +202,7 @@ class SolicitacoesAppPro:
             fg='#FFFFFF'  # Branco (contraste sobre o cabeçalho vermelho)
         )
         title_label.pack(side=tk.LEFT, padx=(0, 15))
-        
+
         # Separador vertical
         separator = tk.Label(
             header_content,
@@ -195,7 +212,7 @@ class SolicitacoesAppPro:
             fg='#7f8c8d'  # Cinza
         )
         separator.pack(side=tk.LEFT, padx=(0, 15))
-        
+
         # Subtítulo
         subtitle_label = tk.Label(
             header_content,
@@ -205,7 +222,7 @@ class SolicitacoesAppPro:
             fg='#ecf0f1'  # Branco suave
         )
         subtitle_label.pack(side=tk.LEFT)
-        
+
         # ========== PAINEL DE CONTROLE ==========
         control_frame = ctk.CTkFrame(
             main_frame,
@@ -215,18 +232,18 @@ class SolicitacoesAppPro:
             border_color='#bdc3c7'
         )
         control_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
-        
+
         # Linha 1: Arquivo
         file_frame = tk.Frame(control_frame, bg='white')
         file_frame.pack(fill=tk.X, padx=15, pady=10)
-        
+
         tk.Label(
             file_frame,
             text="📂 Arquivo:",
             font=('Quicksand', 14, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=(0, 10))
-        
+
         self.arquivo_entry = ctk.CTkEntry(
             file_frame,
             font=('Quicksand', 11),
@@ -237,7 +254,7 @@ class SolicitacoesAppPro:
         )
         self.arquivo_entry.insert(0, self.config.get('ultimo_arquivo', 'simecr05.xlsx'))
         self.arquivo_entry.pack(side=tk.LEFT, padx=(0, 10))
-        
+
         ctk.CTkButton(
             file_frame,
             text="Procurar...",
@@ -251,7 +268,7 @@ class SolicitacoesAppPro:
             width=130,
             height=36
         ).pack(side=tk.LEFT, padx=(0, 10))
-        
+
         ctk.CTkButton(
             file_frame,
             text="🔄 Carregar Dados",
@@ -265,18 +282,18 @@ class SolicitacoesAppPro:
             width=170,
             height=36
         ).pack(side=tk.LEFT)
-        
+
         # Linha 2: Filtros de Data
         filter_frame = tk.Frame(control_frame, bg='white')
         filter_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
-        
+
         tk.Label(
             filter_frame,
             text="📅 Filtrar por Data de Emissão:",
             font=('Quicksand', 14, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=(0, 10))
-        
+
         tk.Label(filter_frame, text="De:", font=('Quicksand', 13, 'bold'), bg='white').pack(side=tk.LEFT, padx=(0, 5))
         self.data_inicio = DateEntry(
             filter_frame,
@@ -289,7 +306,7 @@ class SolicitacoesAppPro:
             locale='pt_BR'
         )
         self.data_inicio.pack(side=tk.LEFT, padx=(0, 20))
-        
+
         tk.Label(filter_frame, text="Até:", font=('Quicksand', 13, 'bold'), bg='white').pack(side=tk.LEFT, padx=(10, 5))
         self.data_fim = DateEntry(
             filter_frame,
@@ -302,10 +319,10 @@ class SolicitacoesAppPro:
             locale='pt_BR'
         )
         self.data_fim.pack(side=tk.LEFT, padx=(0, 20))
-        
+
         # Atalhos de data
         tk.Label(filter_frame, text="Atalhos:", font=('Quicksand', 13, 'bold'), bg='white').pack(side=tk.LEFT, padx=(0, 5))
-        
+
         for texto, tipo in [("Hoje", 'hoje'), ("Semana", 'semana'), ("Mês", 'mes')]:
             ctk.CTkButton(
                 filter_frame,
@@ -336,7 +353,7 @@ class SolicitacoesAppPro:
             width=150,
             height=36
         ).pack(side=tk.LEFT, padx=(0, 10))
-        
+
         ctk.CTkButton(
             filter_frame,
             text="🔄 Limpar Filtro",
@@ -350,15 +367,15 @@ class SolicitacoesAppPro:
             width=150,
             height=36
         ).pack(side=tk.LEFT)
-        
+
         # ========== SISTEMA DE ABAS ==========
         self.notebook = ttk.Notebook(main_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        
+
         # Estilo das abas
         style = ttk.Style()
         style.configure('TNotebook.Tab', font=('Quicksand', 12, 'bold'), padding=[20, 10])
-        
+
         # Criar abas
         self.criar_aba_dados()
         self.criar_aba_status_atendimento()
@@ -375,7 +392,7 @@ class SolicitacoesAppPro:
     def criar_aba_dados(self):
         self.aba_dados = tk.Frame(self.notebook, bg='#fdecea')  # Vermelho claro
         self.notebook.add(self.aba_dados, text='📋 Solicitações Pendentes')
-        
+
         # Info e exportação
         info_frame = ctk.CTkFrame(
             self.aba_dados,
@@ -385,7 +402,7 @@ class SolicitacoesAppPro:
             border_color='#DC143C'
         )
         info_frame.pack(fill=tk.X, pady=(10, 10), padx=10)
-        
+
         self.info_label = tk.Label(
             info_frame,
             text="📊 Nenhum dado carregado",
@@ -395,7 +412,7 @@ class SolicitacoesAppPro:
             anchor='w'
         )
         self.info_label.pack(side=tk.LEFT, padx=15, pady=8)
-        
+
         # Progress bar (inicialmente oculta)
         self.progress_bar = ctk.CTkProgressBar(
             info_frame,
@@ -405,7 +422,7 @@ class SolicitacoesAppPro:
             fg_color='#ecf0f1',
             progress_color='#DC143C'
         )
-        
+
         # Badge de filtro ativo
         self.filtro_badge = tk.Label(
             info_frame,
@@ -417,7 +434,7 @@ class SolicitacoesAppPro:
             pady=3
         )
         self.filtro_badge.pack(side=tk.LEFT, padx=(0, 15))
-        
+
         ctk.CTkButton(
             info_frame,
             text="💾 Exportar para Excel",
@@ -430,7 +447,7 @@ class SolicitacoesAppPro:
             corner_radius=8,
             width=180
         ).pack(side=tk.RIGHT, padx=15, pady=5)
-        
+
         # Título centralizado
         title_frame = ctk.CTkFrame(
             self.aba_dados,
@@ -440,7 +457,7 @@ class SolicitacoesAppPro:
         )
         title_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         title_frame.pack_propagate(False)
-        
+
         tk.Label(
             title_frame,
             text="📋 Solicitações Pendentes",
@@ -448,7 +465,7 @@ class SolicitacoesAppPro:
             bg='#A4133C',
             fg='#ECF0F1'
         ).pack(expand=True)
-        
+
         # Campo de busca
         search_frame = ctk.CTkFrame(
             self.aba_dados,
@@ -458,17 +475,17 @@ class SolicitacoesAppPro:
             border_color='#95a5a6'
         )
         search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
+
         tk.Label(
             search_frame,
             text="🔍 Buscar:",
             font=('Quicksand', 10, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=(15, 5), pady=8)
-        
+
         self.search_var = tk.StringVar()
         self.search_var.trace('w', lambda *args: self.filtrar_tabela_busca())
-        
+
         search_entry = ctk.CTkEntry(
             search_frame,
             textvariable=self.search_var,
@@ -480,7 +497,7 @@ class SolicitacoesAppPro:
             placeholder_text="Digite para buscar..."
         )
         search_entry.pack(side=tk.LEFT, padx=(0, 10), pady=8)
-        
+
         tk.Label(
             search_frame,
             text="(Busca por Descrição, Setor, Solicitante, Código)",
@@ -546,25 +563,25 @@ class SolicitacoesAppPro:
         # Tabela
         table_frame = tk.Frame(self.aba_dados, bg='white', relief=tk.RAISED, borderwidth=2)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
+
         # Configurar grid
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
-        
+
         self.tree = ttk.Treeview(
             table_frame,
             selectmode='extended'
         )
-        
+
         scroll_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.tree.yview)
         scroll_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
-        
+
         self.tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
-        
+
         self.tree.grid(row=0, column=0, sticky='nsew')
         scroll_y.grid(row=0, column=1, sticky='ns')
         scroll_x.grid(row=1, column=0, sticky='ew')
-        
+
         style = ttk.Style()
         style.theme_use('clam')
         style.configure(
@@ -585,7 +602,7 @@ class SolicitacoesAppPro:
     def criar_aba_status_atendimento(self):
         self.aba_status = tk.Frame(self.notebook, bg='#e8f8f5')  # Verde claro
         self.notebook.add(self.aba_status, text='✅ Status de Atendimento')
-        
+
         # Info e KPIs
         info_frame = ctk.CTkFrame(
             self.aba_status,
@@ -595,7 +612,7 @@ class SolicitacoesAppPro:
             border_color='#27ae60'
         )
         info_frame.pack(fill=tk.X, pady=(10, 10), padx=10)
-        
+
         self.status_info_label = tk.Label(
             info_frame,
             text="📊 Nenhum dado carregado",
@@ -605,7 +622,7 @@ class SolicitacoesAppPro:
             anchor='w'
         )
         self.status_info_label.pack(side=tk.LEFT, padx=15, pady=8)
-        
+
         # KPIs de atendimento com badges coloridos
         self.kpi_atendidas = tk.Label(
             info_frame,
@@ -619,7 +636,7 @@ class SolicitacoesAppPro:
             borderwidth=2
         )
         self.kpi_atendidas.pack(side=tk.LEFT, padx=10)
-        
+
         self.kpi_parciais = tk.Label(
             info_frame,
             text="",
@@ -632,7 +649,7 @@ class SolicitacoesAppPro:
             borderwidth=2
         )
         self.kpi_parciais.pack(side=tk.LEFT, padx=10)
-        
+
         self.kpi_nao_atendidas = tk.Label(
             info_frame,
             text="",
@@ -645,7 +662,7 @@ class SolicitacoesAppPro:
             borderwidth=2
         )
         self.kpi_nao_atendidas.pack(side=tk.LEFT, padx=10)
-        
+
         ctk.CTkButton(
             info_frame,
             text="💾 Exportar para Excel",
@@ -658,7 +675,7 @@ class SolicitacoesAppPro:
             corner_radius=8,
             width=180
         ).pack(side=tk.RIGHT, padx=15, pady=5)
-        
+
         # Título centralizado
         title_frame = ctk.CTkFrame(
             self.aba_status,
@@ -668,7 +685,7 @@ class SolicitacoesAppPro:
         )
         title_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         title_frame.pack_propagate(False)
-        
+
         tk.Label(
             title_frame,
             text="✅ Controle de Atendimento das Solicitações",
@@ -676,7 +693,7 @@ class SolicitacoesAppPro:
             bg='#A4133C',
             fg='#ECF0F1'
         ).pack(expand=True)
-        
+
         # Filtro de Status de Atendimento
         filtro_status_frame = ctk.CTkFrame(
             self.aba_status,
@@ -686,14 +703,14 @@ class SolicitacoesAppPro:
             border_color='#27ae60'
         )
         filtro_status_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
+
         tk.Label(
             filtro_status_frame,
             text="🔍 Filtrar por Status:",
             font=('Quicksand', 10, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=15, pady=8)
-        
+
         self.filtro_atendimento_var = tk.StringVar(value="Todas")
         filtro_combo = ctk.CTkComboBox(
             filtro_status_frame,
@@ -708,7 +725,7 @@ class SolicitacoesAppPro:
             command=lambda choice: self.aplicar_filtro_atendimento()
         )
         filtro_combo.pack(side=tk.LEFT, padx=(0, 20), pady=8)
-        
+
         # Campo de busca
         search_frame = ctk.CTkFrame(
             self.aba_status,
@@ -718,17 +735,17 @@ class SolicitacoesAppPro:
             border_color='#95a5a6'
         )
         search_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
+
         tk.Label(
             search_frame,
             text="🔍 Buscar:",
             font=('Quicksand', 10, 'bold'),
             bg='white'
         ).pack(side=tk.LEFT, padx=(15, 5), pady=8)
-        
+
         self.status_search_var = tk.StringVar()
         self.status_search_var.trace('w', lambda *args: self.filtrar_status_busca())
-        
+
         search_entry = ctk.CTkEntry(
             search_frame,
             textvariable=self.status_search_var,
@@ -740,7 +757,7 @@ class SolicitacoesAppPro:
             placeholder_text="Digite para buscar..."
         )
         search_entry.pack(side=tk.LEFT, padx=(0, 10), pady=8)
-        
+
         tk.Label(
             search_frame,
             text="(Busca por Descrição, Setor, Solicitante, Código)",
@@ -806,21 +823,21 @@ class SolicitacoesAppPro:
         # Tabela
         table_frame = tk.Frame(self.aba_status, bg='white', relief=tk.RAISED, borderwidth=2)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
+
         # Configurar grid
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
-        
+
         self.status_tree = ttk.Treeview(
             table_frame,
             style='Treeview'
         )
-        
+
         scroll_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.status_tree.yview)
         scroll_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.status_tree.xview)
-        
+
         self.status_tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
-        
+
         self.status_tree.grid(row=0, column=0, sticky='nsew')
         scroll_y.grid(row=0, column=1, sticky='ns')
         scroll_x.grid(row=1, column=0, sticky='ew')
@@ -832,17 +849,17 @@ class SolicitacoesAppPro:
     def criar_aba_dashboard(self):
         self.aba_dashboard = tk.Frame(self.notebook, bg='#fef5e7')  # Amarelo claro
         self.notebook.add(self.aba_dashboard, text='📊 Dashboard')
-        
+
         # Container com scroll
         canvas = tk.Canvas(self.aba_dashboard, bg='#fef5e7')
         scrollbar = ttk.Scrollbar(self.aba_dashboard, orient="vertical", command=canvas.yview)
         self.dashboard_frame = tk.Frame(canvas, bg='#fef5e7')
-        
+
         self.dashboard_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        
+
         self._dashboard_canvas_window = canvas.create_window((0, 0), window=self.dashboard_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -852,7 +869,7 @@ class SolicitacoesAppPro:
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
+
         # Placeholder
         tk.Label(
             self.dashboard_frame,
@@ -861,22 +878,22 @@ class SolicitacoesAppPro:
             bg='#fef5e7',
             fg='#7f8c8d'
         ).pack(pady=50)
-    
+
     # ==================== ABA 3: ANÁLISE DETALHADA ====================
     def criar_aba_analise(self):
         self.aba_analise = tk.Frame(self.notebook, bg='#f4ecf7')  # Roxo claro
         self.notebook.add(self.aba_analise, text='📈 Análise Detalhada')
-        
+
         # Container com scroll
         canvas = tk.Canvas(self.aba_analise, bg='#f4ecf7')
         scrollbar = ttk.Scrollbar(self.aba_analise, orient="vertical", command=canvas.yview)
         self.analise_frame = tk.Frame(canvas, bg='#f4ecf7')
-        
+
         self.analise_frame.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
-        
+
         self._analise_canvas_window = canvas.create_window((0, 0), window=self.analise_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -887,7 +904,7 @@ class SolicitacoesAppPro:
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
+
         # Placeholder
         tk.Label(
             self.analise_frame,
@@ -896,16 +913,16 @@ class SolicitacoesAppPro:
             bg='#f4ecf7',
             fg='#7f8c8d'
         ).pack(pady=50)
-    
+
     # ==================== ABA 4: RESUMO EXECUTIVO ====================
     def criar_aba_resumo(self):
         self.aba_resumo = tk.Frame(self.notebook, bg='#fdecea')  # Rosa claro
         self.notebook.add(self.aba_resumo, text='📄 Resumo Executivo')
-        
+
         # Botão de exportar
         btn_frame = tk.Frame(self.aba_resumo, bg='white')
         btn_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         ctk.CTkButton(
             btn_frame,
             text=" Exportar Resumo (TXT)",
@@ -931,7 +948,7 @@ class SolicitacoesAppPro:
             corner_radius=8,
             width=220
         ).pack(side=tk.RIGHT, padx=(0, 10))
-        
+
         # Layout em 2 colunas: texto (esq) + painel KPIs (dir)
         body_frame = tk.Frame(self.aba_resumo, bg='#fdecea')
         body_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
@@ -977,10 +994,10 @@ class SolicitacoesAppPro:
         # Placeholder para os cards de destaque (populados em atualizar_resumo)
         self.resumo_sidebar_content = tk.Frame(self.resumo_sidebar, bg='#fdecea')
         self.resumo_sidebar_content.pack(fill=tk.BOTH, expand=True, padx=8)
-        
+
         self.resumo_text.insert('1.0', "📄 Resumo Executivo será gerado após carregar os dados")
         self.resumo_text.config(state=tk.DISABLED)
-    
+
     # ==================== FILTROS AVANÇADOS ====================
     def _popular_combos_dados(self, df):
         """Popula os dropdowns de filtro da aba Dados com os valores disponíveis no df."""
@@ -1156,9 +1173,12 @@ class SolicitacoesAppPro:
         if filename:
             self.arquivo_entry.delete(0, tk.END)
             self.arquivo_entry.insert(0, filename)
-    
-    def carregar_dados(self):
-        arquivo = self.arquivo_entry.get().strip()
+
+    def carregar_dados(self, arquivo=None, salvar_ultimo=True, usar_cache=True):
+        # arquivo=None usa o campo da UI; o fluxo de "Aplicar Filtro" passa uma
+        # cópia de trabalho já atualizada e desliga cache/persistência do caminho.
+        if arquivo is None:
+            arquivo = self.arquivo_entry.get().strip()
 
         if not arquivo:
             Toast.show(self.root, "Selecione um arquivo Excel primeiro", tipo='warning', duration=3000)
@@ -1173,9 +1193,10 @@ class SolicitacoesAppPro:
             return
 
         # Salvar último arquivo usado
-        self.config['ultimo_arquivo'] = arquivo
-        self.salvar_config()
-        
+        if salvar_ultimo:
+            self.config['ultimo_arquivo'] = arquivo
+            self.salvar_config()
+
         # Mostrar loading state com progress bar
         self.info_label.config(
             text="⏳ Carregando dados...",
@@ -1184,11 +1205,11 @@ class SolicitacoesAppPro:
         self.progress_bar.set(0)
         self.progress_bar.pack(side=tk.LEFT, padx=10)
         self.root.update()
-        
+
         try:
             # Tentar carregar do cache primeiro
-            cache_data = self.carregar_do_cache(arquivo)
-            
+            cache_data = self.carregar_do_cache(arquivo) if usar_cache else None
+
             if cache_data is not None:
                 # Dados do cache
                 self.df_original = cache_data['df_original']
@@ -1239,7 +1260,7 @@ class SolicitacoesAppPro:
                 df_base = df[~df['Grupo'].isin(grupos_excluir)]
                 self.progress_bar.set(0.4)
                 self.root.update()
-                
+
                 # Mapeamento para aba Dados e Dashboard
                 colunas_mapeamento = {
                 'Numero SA': 'Numero SA',
@@ -1254,7 +1275,7 @@ class SolicitacoesAppPro:
                 'Solicitante': 'Solicitante',
                 'Observacao': 'Observacao'
             }
-            
+
                 # Mapeamento adicional para aba Status de Atendimento
                 # 'Atendimento' foi removido — é derivado de Quantidade vs Qtd. Atendida
                 colunas_status_mapeamento = {
@@ -1339,11 +1360,12 @@ class SolicitacoesAppPro:
                 self.df_status_filtrado = df_status_base.copy()
 
                 # Salvar no cache
-                self.salvar_no_cache(arquivo, {
-                    'df_original': self.df_original,
-                    'df_status_original': self.df_status_original
-                })
-            
+                if usar_cache:
+                    self.salvar_no_cache(arquivo, {
+                        'df_original': self.df_original,
+                        'df_status_original': self.df_status_original
+                    })
+
             # Popular combos e atualizar tabelas via pipeline
             self.progress_bar.set(0.6)
             self.root.update()
@@ -1351,19 +1373,19 @@ class SolicitacoesAppPro:
             self._popular_combos_status(self.df_status_filtrado)
             self._refresh_tabela_dados()
             self._refresh_tabela_status()
-            
+
             # Atualizar Dashboard/Análise/Resumo (SEM filtro de status - usa df_filtrado)
             self.progress_bar.set(0.8)
             self.root.update()
             self.atualizar_dashboard()
             self.atualizar_analise()
             self.atualizar_resumo()
-            
+
             # Finalizar progress bar
             self.progress_bar.set(1.0)
             self.root.update()
             self.root.after(500, self.progress_bar.pack_forget)  # Esconder após 500ms
-            
+
             # Toast de sucesso
             if cache_data is not None:
                 Toast.show(
@@ -1379,7 +1401,7 @@ class SolicitacoesAppPro:
                     tipo='success',
                     duration=3000
                 )
-            
+
         except FileNotFoundError:
             self.progress_bar.pack_forget()
             self.info_label.config(text="❌ Arquivo não encontrado", fg='#e74c3c')
@@ -1429,21 +1451,21 @@ class SolicitacoesAppPro:
                 duration=5000
             )
             print(f"Erro detalhado: {e}")  # Log completo no console
-    
+
     def atualizar_tabela(self, df):
         self.tree.delete(*self.tree.get_children())
-        
+
         if df is None or df.empty:
             self.info_label.config(text="📊 Nenhum dado para exibir")
             return
-        
+
         colunas = list(df.columns)
         self.tree['columns'] = colunas
         self.tree['show'] = 'headings'
-        
+
         for col in colunas:
             self.tree.heading(col, text=col)
-            
+
             if col == 'Descricao':
                 width = 350
             elif col == 'Observacao':
@@ -1468,7 +1490,7 @@ class SolicitacoesAppPro:
                 self.tree.heading(col, text='U.M.')
             else:
                 width = 120
-            
+
             anchor = 'w' if col in ('Descricao', 'Observacao') else 'center'
             self.tree.column(col, width=width, anchor=anchor)
 
@@ -1498,13 +1520,13 @@ class SolicitacoesAppPro:
             self.tree.insert('', tk.END, values=valores)
 
         self.info_label.config(text="✅ Dados carregados", fg='#27ae60')
-    
+
     def aplicar_atalho_data(self, tipo):
         """Aplicar atalhos de data (Hoje, Semana, Mês)"""
         from datetime import datetime, timedelta
-        
+
         hoje = datetime.now().date()
-        
+
         if tipo == 'hoje':
             self.data_inicio.set_date(hoje)
             self.data_fim.set_date(hoje)
@@ -1518,100 +1540,264 @@ class SolicitacoesAppPro:
             inicio_mes = hoje.replace(day=1)
             self.data_inicio.set_date(inicio_mes)
             self.data_fim.set_date(hoje)
-        
+
         # Aplicar filtro automaticamente
         self.aplicar_filtro_data()
-    
-    def aplicar_filtro_data(self):
-        if self.df_original is None:
+
+    def _atualizar_planilha_periodo(self, arquivo, data_inicio, data_fim):
+        """Atualiza a consulta ao banco para o período e devolve o caminho da cópia.
+
+        A planilha tem uma conexão ODBC ("Consulta de SIMEC") cujo período de
+        Data de Emissão vem das células Planilha1!C1 (início) e C2 (fim). A1/A2
+        são fórmulas =TEXT(Cx;"aaaammdd") que viram o parâmetro real da query.
+
+        Para não esbarrar em arquivo aberto/travado/somente-leitura (o original
+        costuma estar aberto no Excel ou na rede), trabalhamos sempre numa CÓPIA
+        local exclusiva: copiamos, atualizamos a cópia e lemos dela. O arquivo
+        original nunca é aberto para escrita. Retorna o caminho da cópia
+        atualizada em caso de sucesso, ou None em caso de falha.
+        """
+        try:
+            import win32com.client as win32
+            import pythoncom
+        except ImportError:
             Toast.show(
                 self.root,
-                "Carregue os dados primeiro",
+                "Automação do Excel indisponível (pywin32 não instalado)",
+                tipo='error',
+                duration=5000
+            )
+            return None
+
+        import shutil
+        import time
+        import gc
+        import pywintypes
+
+        self.info_label.config(text="⏳ Atualizando dados...", fg='#e67e22')
+        self.root.config(cursor='wait')
+        self.root.update()
+
+        # Cópia de trabalho local exclusiva (imune a lock/somente-leitura/rede)
+        appdata = os.path.dirname(self.config_file)
+        carimbo = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        work = os.path.join(appdata, f"_rubi_work_{carimbo}.xlsx")
+        try:
+            shutil.copy2(arquivo, work)
+        except Exception as e:
+            Toast.show(
+                self.root,
+                f"Não foi possível copiar a planilha: {str(e)[:80]}",
+                tipo='error',
+                duration=6000
+            )
+            return None
+
+        # Reexecuta chamadas COM rejeitadas por Excel ocupado
+        # (RPC_E_CALL_REJECTED / RPC_E_SERVERCALL_RETRYLATER), o que ocorre
+        # enquanto a consulta ao banco ainda está em andamento.
+        def _com_retry(func, tentativas=180, espera=1.0):
+            ocupado = (-2147418111, -2147417846)
+            ultimo = None
+            for _ in range(tentativas):
+                try:
+                    return func()
+                except pywintypes.com_error as e:
+                    if e.args and e.args[0] in ocupado:
+                        ultimo = e
+                        time.sleep(espera)
+                        continue
+                    raise
+            if ultimo is not None:
+                raise ultimo
+
+        _epoca_excel = datetime(1899, 12, 30)
+
+        def _serial_excel(d):
+            return (datetime(d.year, d.month, d.day) - _epoca_excel).days
+
+        excel = None
+        wb = None
+        pythoncom.CoInitialize()
+        try:
+            # Aplica o retry também em criação/escrita/leitura COM (não só no
+            # Refresh): ao abrir o arquivo o Excel pode disparar a consulta sozinho
+            # (RefreshOnFileOpen) e ficar ocupado, rejeitando as próximas chamadas.
+            def _set(obj, prop, value):
+                _com_retry(lambda: setattr(obj, prop, value))
+
+            excel = _com_retry(lambda: win32.DispatchEx("Excel.Application"))
+            _set(excel, 'Visible', False)
+            _set(excel, 'DisplayAlerts', False)
+            _set(excel, 'AskToUpdateLinks', False)
+            _set(excel, 'EnableEvents', False)
+
+            wb = _com_retry(lambda: excel.Workbooks.Open(os.path.abspath(work)))
+
+            # Drena qualquer consulta que o Excel tenha disparado ao abrir (params
+            # antigos), senão ele fica ocupado e rejeita as chamadas seguintes.
+            _com_retry(excel.CalculateUntilAsyncQueriesDone)
+
+            if _com_retry(lambda: wb.ReadOnly):
+                raise RuntimeError("a cópia de trabalho abriu como somente-leitura")
+
+            # Localiza a aba de parâmetros (Planilha1)
+            ws = None
+            _n_abas = _com_retry(lambda: wb.Worksheets.Count)
+            for _i in range(1, _n_abas + 1):
+                sh = _com_retry(lambda i=_i: wb.Worksheets.Item(i))
+                nome = _com_retry(lambda s=sh: s.Name)
+                if str(nome).strip().lower() == 'planilha1':
+                    ws = sh
+                    break
+            if ws is None:
+                raise RuntimeError("Aba 'Planilha1' (parâmetros) não encontrada na planilha")
+
+            # Grava o período nas células de parâmetro como número de série do Excel
+            # (escrever datetime via COM exigiria win32timezone; o número evita isso).
+            _com_retry(lambda: setattr(ws.Range("C1"), 'Value', _serial_excel(data_inicio)))
+            _com_retry(lambda: setattr(ws.Range("C2"), 'Value', _serial_excel(data_fim)))
+            _com_retry(excel.CalculateFull)
+
+            # Atualiza de forma SÍNCRONA: QueryTable.Refresh(False) força a consulta
+            # sem segundo plano, evitando o Save antes de a query terminar.
+            atualizou = False
+            for _i in range(1, _n_abas + 1):
+                sh = _com_retry(lambda i=_i: wb.Worksheets.Item(i))
+                try:
+                    _n_lo = _com_retry(lambda s=sh: s.ListObjects.Count)
+                    for li in range(1, _n_lo + 1):
+                        try:
+                            qt = _com_retry(lambda s=sh, l=li: s.ListObjects.Item(l).QueryTable)
+                            _com_retry(lambda q=qt: q.Refresh(False))
+                            atualizou = True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    _n_qt = _com_retry(lambda s=sh: s.QueryTables.Count)
+                    for qi in range(1, _n_qt + 1):
+                        try:
+                            qt = _com_retry(lambda s=sh, q=qi: s.QueryTables.Item(q))
+                            _com_retry(lambda q=qt: q.Refresh(False))
+                            atualizou = True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            if not atualizou:
+                # Fallback: atualiza pelas conexões (best-effort síncrono)
+                _n_conn = _com_retry(lambda: wb.Connections.Count)
+                for i in range(1, _n_conn + 1):
+                    conn = _com_retry(lambda i=i: wb.Connections.Item(i))
+                    for attr in ('OLEDBConnection', 'ODBCConnection'):
+                        try:
+                            _set(getattr(conn, attr), 'BackgroundQuery', False)
+                        except Exception:
+                            pass
+                    _com_retry(conn.Refresh)
+                _com_retry(excel.CalculateUntilAsyncQueriesDone)
+
+            _com_retry(wb.Save)
+            return work
+
+        except Exception as e:
+            msg = str(e)
+            if len(msg) > 120:
+                msg = msg[:120] + "..."
+            Toast.show(
+                self.root,
+                f"Falha ao atualizar via Excel: {msg}",
+                tipo='error',
+                duration=6000
+            )
+            print(f"Erro COM Excel: {e}")
+            try:
+                if os.path.exists(work):
+                    os.remove(work)
+            except Exception:
+                pass
+            return None
+
+        finally:
+            # Encerra o Excel e libera as referências COM (evita processos zumbis
+            # que ficariam segurando o arquivo e o deixariam somente-leitura).
+            try:
+                if wb is not None:
+                    wb.Close(SaveChanges=False)
+            except Exception:
+                pass
+            try:
+                if excel is not None:
+                    excel.Quit()
+            except Exception:
+                pass
+            wb = None
+            excel = None
+            gc.collect()
+            pythoncom.CoUninitialize()
+            self.root.config(cursor='')
+
+    def aplicar_filtro_data(self):
+        """Define o período no banco (via Excel/SIMEC) e recarrega os dados.
+
+        Não é um filtro em memória: como a planilha puxa os dados do banco por
+        intervalo de Data de Emissão, aplicar o período reescreve os parâmetros
+        da consulta, atualiza no Excel e recarrega o arquivo já com o novo recorte.
+        """
+        arquivo = self.arquivo_entry.get().strip()
+        if not arquivo or not os.path.isfile(arquivo):
+            Toast.show(
+                self.root,
+                "Selecione um arquivo Excel válido primeiro",
                 tipo='warning',
                 duration=3000
             )
             return
-        
+
         try:
             data_inicio = self.data_inicio.get_date()
             data_fim = self.data_fim.get_date()
-            
-            data_inicio_pd = pd.Timestamp(data_inicio)
-            data_fim_pd = pd.Timestamp(data_fim)
-            
-            if data_inicio_pd > data_fim_pd:
-                Toast.show(
-                    self.root,
-                    "Data inicial não pode ser maior que a final",
-                    tipo='warning',
-                    duration=3000
-                )
-                return
-            
-            # Guardar datas do filtro
-            self.filtro_data_inicio = data_inicio_pd
-            self.filtro_data_fim = data_fim_pd
-            
-            # Filtrar por data (para Dashboard/Análise/Resumo)
-            df_filtrado_data = self.df_original[
-                (self.df_original['Data Emissao'] >= data_inicio_pd) &
-                (self.df_original['Data Emissao'] <= data_fim_pd)
-            ]
-            
-            # df_filtrado = usado por Dashboard/Análise/Resumo (SEM filtro de status)
-            self.df_filtrado = df_filtrado_data.copy()
-            
-            # Filtrar aba Status de Atendimento por data também
-            if hasattr(self, 'df_status_original'):
-                df_status_filtrado_data = self.df_status_original[
-                    (self.df_status_original['Data Emissao'] >= data_inicio_pd) &
-                    (self.df_status_original['Data Emissao'] <= data_fim_pd)
-                ]
-                self.df_status_filtrado = df_status_filtrado_data.copy()
-            
-            # Popular combos e atualizar tabelas via pipeline
-            self._popular_combos_dados(self.df_filtrado)
-            if hasattr(self, 'df_status_filtrado'):
-                self._popular_combos_status(self.df_status_filtrado)
-            self._refresh_tabela_dados()
-            self._refresh_tabela_status()
+        except (ValueError, AttributeError):
+            Toast.show(self.root, "Data inválida selecionada", tipo='warning', duration=3000)
+            return
 
-            # Atualizar Dashboard/Análise/Resumo (SEM filtro de status)
-            self.atualizar_dashboard()
-            self.atualizar_analise()
-            self.atualizar_resumo()
-            
-            # Atualizar badge de filtro ativo
-            self.filtro_badge.config(
-                text=f"🔍 FILTRO ATIVO: {data_inicio.strftime('%d/%m/%Y')} - {data_fim.strftime('%d/%m/%Y')}",
-                bg='#DC143C',
-                fg='white'
-            )
-            
-            # Toast de sucesso
+        if data_inicio > data_fim:
             Toast.show(
                 self.root,
-                f"Filtro aplicado: {len(self.df_filtrado)} registros encontrados",
-                tipo='success',
-                duration=3000
-            )
-            
-        except ValueError as e:
-            Toast.show(
-                self.root,
-                "Data inválida selecionada",
+                "Data inicial não pode ser maior que a final",
                 tipo='warning',
                 duration=3000
             )
-        except Exception as e:
-            Toast.show(
-                self.root,
-                f"Erro ao aplicar filtro: {str(e)[:80]}",
-                tipo='error',
-                duration=4000
-            )
-            print(f"Erro detalhado ao filtrar: {e}")
-    
+            return
+
+        # 1. Atualiza a consulta ao banco para o período (numa cópia de trabalho)
+        work = self._atualizar_planilha_periodo(arquivo, data_inicio, data_fim)
+        if not work:
+            return  # toast de erro já exibido
+
+        # 2. Lê os dados da cópia atualizada (sem cache, sem virar "último arquivo")
+        #    e remove a cópia em seguida — os dados já ficam em memória.
+        try:
+            self.carregar_dados(arquivo=work, salvar_ultimo=False, usar_cache=False)
+        finally:
+            try:
+                if os.path.exists(work):
+                    os.remove(work)
+            except Exception:
+                pass
+
+        # 3. Guarda o período (usado no Resumo Executivo) e exibe o badge
+        self.filtro_data_inicio = pd.Timestamp(data_inicio)
+        self.filtro_data_fim = pd.Timestamp(data_fim)
+        self.filtro_badge.config(
+            text=f"🔍 PERÍODO: {data_inicio.strftime('%d/%m/%Y')} - {data_fim.strftime('%d/%m/%Y')}",
+            bg='#DC143C',
+            fg='white'
+        )
+
     def limpar_filtro(self):
         if self.df_original is None:
             Toast.show(
@@ -1621,11 +1807,11 @@ class SolicitacoesAppPro:
                 duration=3000
             )
             return
-        
+
         # Limpar datas do filtro
         self.filtro_data_inicio = None
         self.filtro_data_fim = None
-        
+
         # Para Dashboard/Análise/Resumo: usar df_original completo
         self.df_filtrado = self.df_original.copy()
 
@@ -1639,15 +1825,15 @@ class SolicitacoesAppPro:
             self._popular_combos_status(self.df_status_filtrado)
         self._refresh_tabela_dados()
         self._refresh_tabela_status()
-        
+
         # Dashboard/Análise/Resumo usam df_filtrado (sem filtro de status)
         self.atualizar_dashboard()
         self.atualizar_analise()
         self.atualizar_resumo()
-        
+
         # Remover badge de filtro
         self.filtro_badge.config(text="", bg='white')
-        
+
         # Toast de info
         Toast.show(
             self.root,
@@ -1655,13 +1841,13 @@ class SolicitacoesAppPro:
             tipo='info',
             duration=2500
         )
-    
+
     # ==================== ATUALIZAR DASHBOARD ====================
     def atualizar_dashboard(self):
         # Limpar dashboard
         for widget in self.dashboard_frame.winfo_children():
             widget.destroy()
-        
+
         if self.df_filtrado is None or self.df_filtrado.empty:
             tk.Label(
                 self.dashboard_frame,
@@ -1671,24 +1857,24 @@ class SolicitacoesAppPro:
                 fg='#7f8c8d'
             ).pack(pady=50)
             return
-        
+
         df = self.df_filtrado
-        
+
         # ========== KPIs ==========
         kpi_frame = tk.Frame(self.dashboard_frame, bg='#ecf0f1')
         kpi_frame.pack(fill=tk.X, padx=20, pady=20)
-        
+
         df_kpi = df.copy()
 
         # Total de Solicitações: SAs únicas
         total_sas = df_kpi['Numero SA'].nunique()
-        
+
         # Total de Itens: Total de linhas (códigos) sem 'EM APROVAÇÃO'
         total_itens = len(df_kpi)
-        
+
         # Média de Itens por SA
         media_itens_sa = round(total_itens / total_sas, 2) if total_sas > 0 else 0
-        
+
         kpis = [
             ("📦 Total de Solicitações", total_sas, "#DC143C"),
             ("📊 Total de Itens", total_itens, "#27ae60"),
@@ -1696,21 +1882,21 @@ class SolicitacoesAppPro:
             ("👥 Solicitantes", df_kpi['Solicitante'].nunique(), "#9b59b6"),
             ("📈 Média Itens/SA", media_itens_sa, "#e74c3c")
         ]
-        
+
         for titulo, valor, cor in kpis:
             self.criar_kpi_card(kpi_frame, titulo, valor, cor).pack(side=tk.LEFT, padx=10, expand=True, fill=tk.BOTH)
-        
+
         # ========== GRÁFICOS ==========
         graficos_frame = tk.Frame(self.dashboard_frame, bg='#ecf0f1')
         graficos_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-        
+
         # Apenas 2 gráficos lado a lado: Top Setores + Top Solicitantes
         self.criar_grafico_top_setores(graficos_frame).pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         self.criar_grafico_top_solicitantes(graficos_frame).pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
-    
+
     def criar_kpi_card(self, parent, titulo, valor, cor):
         card = tk.Frame(parent, bg=cor, relief=tk.RAISED, borderwidth=3)
-        
+
         tk.Label(
             card,
             text=titulo,
@@ -1718,7 +1904,7 @@ class SolicitacoesAppPro:
             bg=cor,
             fg='white'
         ).pack(pady=(15, 5))
-        
+
         tk.Label(
             card,
             text=f"{valor:,}".replace(',', '.'),
@@ -1726,78 +1912,78 @@ class SolicitacoesAppPro:
             bg=cor,
             fg='white'
         ).pack(pady=(5, 15))
-        
+
         return card
-    
+
     def criar_grafico_top_setores(self, parent):
         frame = tk.Frame(parent, bg='white', relief=tk.RAISED, borderwidth=2)
-        
+
         tk.Label(
             frame,
             text="🏢 Top 10 Setores (por número de solicitações)",
             font=('Quicksand', 12, 'bold'),
             bg='white'
         ).pack(pady=10)
-        
+
         fig = Figure(figsize=(7, 4.5), dpi=100)
         ax = fig.add_subplot(111)
-        
+
         df = self.df_filtrado
         top_setores = df['Setor'].value_counts().head(10).sort_values(ascending=True)
-        
+
         ax.barh(range(len(top_setores)), top_setores.values, color='#27ae60')
         ax.set_yticks(range(len(top_setores)))
         ax.set_yticklabels([s[:40] + '...' if len(s) > 40 else s for s in top_setores.index], fontsize=10)
         ax.set_xlabel('Número de Solicitações', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, axis='x')
-        
+
         # Forçar valores inteiros no eixo X
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
         fig.tight_layout()
-        
+
         canvas = FigureCanvasTkAgg(fig, frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
+
         return frame
-    
+
     def criar_grafico_top_solicitantes(self, parent):
         frame = tk.Frame(parent, bg='white', relief=tk.RAISED, borderwidth=2)
-        
+
         tk.Label(
             frame,
             text="👥 Top 10 Solicitantes",
             font=('Quicksand', 12, 'bold'),
             bg='white'
         ).pack(pady=10)
-        
+
         fig = Figure(figsize=(7, 4.5), dpi=100)
         ax = fig.add_subplot(111)
-        
+
         df = self.df_filtrado
         top_solicitantes = df['Solicitante'].value_counts().head(10).sort_values(ascending=True)
-        
+
         ax.barh(range(len(top_solicitantes)), top_solicitantes.values, color='#9b59b6')
         ax.set_yticks(range(len(top_solicitantes)))
         ax.set_yticklabels(top_solicitantes.index, fontsize=10)
         ax.set_xlabel('Número de Solicitações', fontsize=12, fontweight='bold')
         ax.grid(True, alpha=0.3, axis='x')
-        
+
         # Forçar valores inteiros no eixo X
         ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
         fig.tight_layout()
-        
+
         canvas = FigureCanvasTkAgg(fig, frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
+
         return frame
-    
+
     # ==================== ATUALIZAR ANÁLISE ====================
     def atualizar_analise(self):
         for widget in self.analise_frame.winfo_children():
             widget.destroy()
-        
+
         if self.df_filtrado is None or self.df_filtrado.empty:
             tk.Label(
                 self.analise_frame,
@@ -1807,7 +1993,7 @@ class SolicitacoesAppPro:
                 fg='#7f8c8d'
             ).pack(pady=50)
             return
-        
+
         df = self.df_filtrado
 
         # Faixa de título (padrão das outras abas)
@@ -1833,69 +2019,69 @@ class SolicitacoesAppPro:
         graficos_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 20))
 
         self.criar_grafico_dias_semana(graficos_frame).pack(fill=tk.BOTH, expand=True)
-    
+
     def criar_grafico_dias_semana(self, parent):
         frame = tk.Frame(parent, bg='white', relief=tk.RAISED, borderwidth=2)
-        
+
         tk.Label(
             frame,
             text="📅 Distribuição por Dia da Semana",
             font=('Quicksand', 12, 'bold'),
             bg='white'
         ).pack(pady=10)
-        
+
         fig = Figure(figsize=(12, 5), dpi=100)
         ax = fig.add_subplot(111)
-        
+
         # Usa cópia local para não mutar self.df_filtrado com a coluna auxiliar
         df = self.df_filtrado.copy()
         df['Dia Semana'] = df['Data Emissao'].dt.day_name()
         dias_ordem = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         dias_pt = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
-        
+
         # Contar SAs únicas por dia da semana (não itens)
         valores = []
         for dia in dias_ordem:
             sas_unicas = df[df['Dia Semana'] == dia]['Numero SA'].nunique()
             valores.append(sas_unicas)
-        
+
         ax.bar(dias_pt, valores, color='#9b59b6', width=0.6)
         ax.set_ylabel('Número de Solicitações', fontsize=14, fontweight='bold')
         ax.set_xlabel('Dia da Semana', fontsize=14, fontweight='bold')
         ax.tick_params(axis='both', labelsize=12)
         ax.grid(True, alpha=0.3, axis='y')
         fig.tight_layout()
-        
+
         canvas = FigureCanvasTkAgg(fig, frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
+
         return frame
-    
+
     # ==================== ATUALIZAR RESUMO ====================
     def atualizar_resumo(self):
         self.resumo_text.config(state=tk.NORMAL)
         self.resumo_text.delete('1.0', tk.END)
-        
+
         if self.df_filtrado is None or self.df_filtrado.empty:
             self.resumo_text.insert('1.0', "📄 Nenhum dado para exibir")
             self.resumo_text.config(state=tk.DISABLED)
             return
-        
+
         df = self.df_filtrado
-        
+
         # Calcular período e dias úteis
         if self.filtro_data_inicio and self.filtro_data_fim:
             # Se há filtro ativo, usar as datas do filtro
             data_inicio_str = self.filtro_data_inicio.strftime('%d/%m/%Y')
             data_fim_str = self.filtro_data_fim.strftime('%d/%m/%Y')
-            
+
             # Calcular dias úteis (segunda a sexta)
             from datetime import timedelta
             dias_uteis = 0
             data_atual = self.filtro_data_inicio.date()
             data_fim_date = self.filtro_data_fim.date()
-            
+
             while data_atual <= data_fim_date:
                 # 0 = segunda, 6 = domingo
                 if data_atual.weekday() < 5:  # Segunda a sexta
@@ -1907,19 +2093,19 @@ class SolicitacoesAppPro:
             dt_max = df['Data Emissao'].max()
             data_inicio_str = dt_min.strftime('%d/%m/%Y') if pd.notna(dt_min) else 'N/D'
             data_fim_str    = dt_max.strftime('%d/%m/%Y') if pd.notna(dt_max) else 'N/D'
-            
+
             # Calcular dias úteis baseado nas datas únicas nos dados
             from datetime import timedelta
             dias_uteis = 0
             data_min = df['Data Emissao'].min().date()
             data_max = df['Data Emissao'].max().date()
             data_atual = data_min
-            
+
             while data_atual <= data_max:
                 if data_atual.weekday() < 5:  # Segunda a sexta
                     dias_uteis += 1
                 data_atual += timedelta(days=1)
-        
+
         # Gerar resumo
         resumo = f"""
 {'='*80}
@@ -1945,7 +2131,7 @@ Solicitantes:                 {df['Solicitante'].nunique():,}
         top_setores = df['Setor'].value_counts().head(5)
         for i, (setor, qtd) in enumerate(top_setores.items(), 1):
             resumo += f"{i}. {setor[:50]:<50} {qtd:>10,} itens\n"
-        
+
         resumo += f"""
 👥 TOP 5 SOLICITANTES (por número de solicitações)
 {'─'*80}
@@ -1953,7 +2139,7 @@ Solicitantes:                 {df['Solicitante'].nunique():,}
         top_solicitantes = df['Solicitante'].value_counts().head(5)
         for i, (solicitante, qtd) in enumerate(top_solicitantes.items(), 1):
             resumo += f"{i}. {solicitante:<50} {qtd:>10,} solicitações\n"
-        
+
         resumo += f"""
 🎯 TOP 10 MATERIAIS MAIS SOLICITADOS
 {'─'*80}
@@ -1961,7 +2147,7 @@ Solicitantes:                 {df['Solicitante'].nunique():,}
         top_materiais = df['Descricao'].value_counts().head(10)
         for i, (material, qtd) in enumerate(top_materiais.items(), 1):
             resumo += f"{i:>2}. {material[:60]:<60} {qtd:>8,}\n"
-        
+
         resumo += f"""
 📄 LISTA DE SAs ÚNICAS (sem repetição)
 {'─'*80}
@@ -1973,7 +2159,7 @@ Total de SAs: {df['Numero SA'].nunique()}
             resumo += f"{sa}  "
             if i % 10 == 0:
                 resumo += "\n"
-        
+
         resumo += f"""
 
 {'='*80}
@@ -1981,7 +2167,7 @@ Relatório gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}
 Rubi - Sistema de Controle de Solicitações
 {'='*80}
 """
-        
+
         self.resumo_text.insert('1.0', resumo)
         self.resumo_text.config(state=tk.DISABLED)
 
@@ -2052,24 +2238,24 @@ Rubi - Sistema de Controle de Solicitações
     # ==================== BUSCA RÁPIDA ====================
     def filtrar_tabela_busca(self):
         self._refresh_tabela_dados()
-    
+
     # ==================== ABA STATUS DE ATENDIMENTO - FUNÇÕES ====================
     def atualizar_tabela_status(self, df):
         """Atualizar tabela da aba Status de Atendimento"""
         self.status_tree.delete(*self.status_tree.get_children())
-        
+
         if df is None or df.empty:
             self.status_info_label.config(text="📊 Nenhum dado para exibir")
             self.kpi_atendidas.config(text="")
             self.kpi_parciais.config(text="")
             self.kpi_nao_atendidas.config(text="")
             return
-        
+
         # Configurar colunas
         colunas = list(df.columns)
         self.status_tree['columns'] = colunas
         self.status_tree['show'] = 'headings'
-        
+
         # Configurar larguras e cabeçalhos
         larguras = {
             'Numero SA': 90,
@@ -2087,7 +2273,7 @@ Rubi - Sistema de Controle de Solicitações
             'Custo Unitario': 100,
             'Custo Total': 100
         }
-        
+
         for col in colunas:
             width = larguras.get(col, 120)
             anchor = 'w' if col == 'Descricao' else 'center'
@@ -2128,31 +2314,31 @@ Rubi - Sistema de Controle de Solicitações
                     valores.append(f"R$ {valor:,.2f}" if not pd.isna(valor) else '')
                 else:
                     valores.append(str(valor))
-            
+
             self.status_tree.insert('', tk.END, values=valores)
-        
+
         # Atualizar KPIs
         total = len(df)
         atendidas = len(df[df['Atendimento'] == 'TOTALMENTE ATENDIDA'])
         parciais = len(df[df['Atendimento'] == 'PARCIALMENTE ATENDIDA'])
         nao_atendidas = len(df[df['Atendimento'] == 'NÃO ATENDIDA'])
-        
+
         perc_atendidas = (atendidas / total * 100) if total > 0 else 0
         perc_parciais = (parciais / total * 100) if total > 0 else 0
         perc_nao_atendidas = (nao_atendidas / total * 100) if total > 0 else 0
-        
+
         self.status_info_label.config(text="✅ Dados carregados", fg='#27ae60')
-        
+
         self.kpi_atendidas.config(text=f"✅ Atendidas: {atendidas} ({perc_atendidas:.1f}%)")
         self.kpi_parciais.config(text=f"⚠️ Parciais: {parciais} ({perc_parciais:.1f}%)")
         self.kpi_nao_atendidas.config(text=f"❌ Não Atendidas: {nao_atendidas} ({perc_nao_atendidas:.1f}%)")
-    
+
     def aplicar_filtro_atendimento(self):
         self._refresh_tabela_status()
 
     def filtrar_status_busca(self):
         self._refresh_tabela_status()
-    
+
     def exportar_status_excel(self):
         """Exportar dados da aba Status de Atendimento para Excel"""
         if not hasattr(self, 'df_status_filtrado') or self.df_status_filtrado is None or self.df_status_filtrado.empty:
@@ -2163,13 +2349,13 @@ Rubi - Sistema de Controle de Solicitações
                 duration=3000
             )
             return
-        
+
         filename = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
             initialfile="status_atendimento.xlsx"
         )
-        
+
         if filename:
             self.root.config(cursor='wait')
             self.root.update()
@@ -2198,7 +2384,7 @@ Rubi - Sistema de Controle de Solicitações
                 print(f"Erro detalhado na exportação: {e}")
             finally:
                 self.root.config(cursor='')
-    
+
     # ==================== EXPORTAÇÕES ====================
     def exportar_excel(self):
         if self.df_filtrado is None or self.df_filtrado.empty:
@@ -2209,13 +2395,13 @@ Rubi - Sistema de Controle de Solicitações
                 duration=3000
             )
             return
-        
+
         filename = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
             initialfile="solicitacoes_filtradas.xlsx"
         )
-        
+
         if filename:
             self.root.config(cursor='wait')
             self.root.update()
@@ -2248,7 +2434,7 @@ Rubi - Sistema de Controle de Solicitações
                 print(f"Erro detalhado na exportação: {e}")
             finally:
                 self.root.config(cursor='')
-    
+
     def gerar_hash_arquivo(self, filepath):
         """Gera hash MD5 do arquivo para detectar mudanças"""
         try:
@@ -2260,7 +2446,7 @@ Rubi - Sistema de Controle de Solicitações
         except Exception as e:
             print(f"Erro ao gerar hash: {e}")
             return None
-    
+
     def obter_cache_path(self, arquivo):
         """Retorna o caminho base do cache (sem extensão — cada DataFrame tem seu sufixo)."""
         arquivo_hash = hashlib.md5(arquivo.encode()).hexdigest()
@@ -2323,7 +2509,7 @@ Rubi - Sistema de Controle de Solicitações
         except Exception as e:
             print(f"Erro ao limpar cache: {e}")
             return False
-    
+
     def carregar_config(self):
         """Carrega configurações do arquivo JSON com validação de tipos."""
         defaults = {
@@ -2348,7 +2534,7 @@ Rubi - Sistema de Controle de Solicitações
         except Exception as e:
             print(f"Erro ao carregar config: {e}")
         return defaults
-    
+
     def salvar_config(self):
         """Salva configurações no arquivo JSON"""
         try:
@@ -2356,7 +2542,7 @@ Rubi - Sistema de Controle de Solicitações
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"Erro ao salvar config: {e}")
-    
+
     def exportar_resumo(self):
         if self.df_filtrado is None or self.df_filtrado.empty:
             Toast.show(
@@ -2366,13 +2552,13 @@ Rubi - Sistema de Controle de Solicitações
                 duration=3000
             )
             return
-        
+
         filename = filedialog.asksaveasfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
             initialfile="resumo_executivo.txt"
         )
-        
+
         if filename:
             self.root.config(cursor='wait')
             self.root.update()
@@ -2689,13 +2875,13 @@ Rubi - Sistema de Controle de Solicitações
 
 if __name__ == "__main__":
     _registrar_fontes()
-    
+
     # Configurar tema do CustomTkinter
     ctk.set_appearance_mode("light")  # Modo claro fixo
     # Tema customizado carmesim/rubi (cai para "blue" embutido se o arquivo faltar)
     _tema = _caminho_recurso('rubi_theme.json')
     ctk.set_default_color_theme(_tema if os.path.isfile(_tema) else "blue")
-    
+
     root = ctk.CTk()  # Usar CTk ao invés de tk.Tk()
     app = SolicitacoesAppPro(root)
     try:
