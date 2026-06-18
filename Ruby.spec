@@ -1,9 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Configuração de build do Rubi (PyInstaller 6.x) — executável único e sem console.
+# Configuração de build do Ruby (PyInstaller 6.x) — executável único e sem console.
 from PyInstaller.utils.hooks import collect_data_files
 
 # Dados empacotados:
-# - assets/ do projeto: fontes Quicksand + tema customizado rubi_theme.json
+# - assets/ do projeto: fontes Quicksand + tema customizado ruby_theme.json
 # - assets internos do CustomTkinter (temas/fontes) — sem isso o exe não abre a UI
 datas = [('assets', 'assets')]
 datas += collect_data_files('customtkinter')
@@ -30,7 +30,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Rubi',
+    name='Ruby',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

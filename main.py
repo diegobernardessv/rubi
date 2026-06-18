@@ -138,7 +138,7 @@ def _registrar_fontes():
 class SolicitacoesAppPro:
     def __init__(self, root):
         self.root = root
-        self.root.title("♦ Rubi - Sistema de Controle de Solicitações")
+        self.root.title("♦ Ruby - Sistema de Controle de Solicitações")
         self.root.geometry("1600x900")
         self.root.configure(bg='#f0f0f0')
 
@@ -165,7 +165,15 @@ class SolicitacoesAppPro:
         self._combo_solicitante_status = None
 
         # Diretório de dados do app em %APPDATA% — funciona tanto em dev quanto no .exe
-        _app_data = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'RubiApp')
+        _base = os.environ.get('APPDATA', os.path.expanduser('~'))
+        _app_data = os.path.join(_base, 'RubyApp')
+        # Migração do nome antigo (RubiApp -> RubyApp): preserva config e cache do usuário
+        _app_data_antigo = os.path.join(_base, 'RubiApp')
+        if not os.path.isdir(_app_data) and os.path.isdir(_app_data_antigo):
+            try:
+                os.rename(_app_data_antigo, _app_data)
+            except Exception:
+                pass
         os.makedirs(_app_data, exist_ok=True)
 
         # Configurações
@@ -188,10 +196,10 @@ class SolicitacoesAppPro:
         self.criar_interface()
 
     def _limpar_copias_trabalho(self):
-        """Apaga cópias de trabalho (_rubi_work_*.xlsx) que tenham sobrado."""
+        """Apaga cópias de trabalho (_ruby_work_*.xlsx) que tenham sobrado."""
         try:
             for nome in os.listdir(self._app_data):
-                if nome.startswith('_rubi_work_') and nome.lower().endswith('.xlsx'):
+                if nome.startswith(('_ruby_work_', '_rubi_work_')) and nome.lower().endswith('.xlsx'):
                     try:
                         os.remove(os.path.join(self._app_data, nome))
                     except Exception:
@@ -216,7 +224,7 @@ class SolicitacoesAppPro:
         # Título principal
         title_label = tk.Label(
             header_content,
-            text="♦ Rubi",
+            text="♦ Ruby",
             font=('Quicksand', 28, 'bold'),
             bg='#A4133C',
             fg='#FFFFFF'  # Branco (contraste sobre o cabeçalho vermelho)
@@ -1606,7 +1614,7 @@ class SolicitacoesAppPro:
         # Cópia de trabalho local exclusiva (imune a lock/somente-leitura/rede)
         appdata = os.path.dirname(self.config_file)
         carimbo = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-        work = os.path.join(appdata, f"_rubi_work_{carimbo}.xlsx")
+        work = os.path.join(appdata, f"_ruby_work_{carimbo}.xlsx")
         try:
             shutil.copy2(arquivo, work)
         except Exception as e:
@@ -2202,7 +2210,7 @@ Total de SAs: {df['Numero SA'].nunique()}
 
 {'='*80}
 Relatório gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}
-Rubi - Sistema de Controle de Solicitações
+Ruby - Sistema de Controle de Solicitações
 {'='*80}
 """
 
@@ -2648,7 +2656,7 @@ Rubi - Sistema de Controle de Solicitações
         filename = filedialog.asksaveasfilename(
             defaultextension=".pdf",
             filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
-            initialfile="relatorio_rubi.pdf"
+            initialfile="relatorio_ruby.pdf"
         )
         if not filename:
             return
@@ -2704,13 +2712,13 @@ Rubi - Sistema de Controle de Solicitações
             # ===== PÁGINA 1: RESUMO EXECUTIVO =====
             pdf.add_page()
 
-            # Cabeçalho carmesim Rubi
+            # Cabeçalho carmesim Ruby
             pdf.set_fill_color(220, 20, 60)
             pdf.rect(0, 0, 210, 30, 'F')
             pdf.set_xy(MARGEM, 7)
             pdf.set_text_color(255, 255, 255)
             pdf.set_font("Quicksand", "B", 17)
-            pdf.cell(0, 9, "RUBI - Sistema de Controle de Solicitacoes", ln=True)
+            pdf.cell(0, 9, "RUBY - Sistema de Controle de Solicitacoes", ln=True)
             pdf.set_xy(MARGEM, 19)
             pdf.set_text_color(245, 230, 235)
             pdf.set_font("Quicksand", "", 9)
@@ -2818,7 +2826,7 @@ Rubi - Sistema de Controle de Solicitações
                 pdf.set_xy(MARGEM, 4)
                 pdf.set_text_color(255, 255, 255)
                 pdf.set_font("Quicksand", "B", 11)
-                pdf.cell(0, 6, "RUBI - Graficos Analiticos", ln=True)
+                pdf.cell(0, 6, "RUBY - Graficos Analiticos", ln=True)
 
                 pdf.set_y(21)
                 pdf.set_text_color(44, 62, 80)
@@ -2855,7 +2863,7 @@ Rubi - Sistema de Controle de Solicitações
         pdf.set_text_color(150, 150, 150)
         pdf.cell(
             largura, 5,
-            f"Rubi  |  {datetime.now().strftime('%d/%m/%Y as %H:%M')}  |  Pag. {pdf.page_no()}",
+            f"Ruby  |  {datetime.now().strftime('%d/%m/%Y as %H:%M')}  |  Pag. {pdf.page_no()}",
             align='C'
         )
 
@@ -2916,8 +2924,8 @@ if __name__ == "__main__":
 
     # Configurar tema do CustomTkinter
     ctk.set_appearance_mode("light")  # Modo claro fixo
-    # Tema customizado carmesim/rubi (cai para "blue" embutido se o arquivo faltar)
-    _tema = _caminho_recurso('rubi_theme.json')
+    # Tema customizado carmesim/ruby (cai para "blue" embutido se o arquivo faltar)
+    _tema = _caminho_recurso('ruby_theme.json')
     ctk.set_default_color_theme(_tema if os.path.isfile(_tema) else "blue")
 
     root = ctk.CTk()  # Usar CTk ao invés de tk.Tk()

@@ -1,4 +1,4 @@
-# ♦ Rubi
+# ♦ Ruby
 
 ## Sistema de Controle de Solicitações ao Armazém
 
@@ -20,7 +20,7 @@
 
 ### **🆕 Novidades da v2.2 - Exportação Avançada**
 
-- ✅ **Exportação PDF** do Resumo Executivo com branding Rubi (cabeçalho carmesim/grafite)
+- ✅ **Exportação PDF** do Resumo Executivo com branding Ruby (cabeçalho carmesim/grafite)
 - ✅ PDF inclui KPIs, top setores/solicitantes/materiais e gráficos integrados
 - ✅ Fontes Quicksand empacotadas no PDF (funciona no executável)
 
@@ -324,15 +324,15 @@ Ou com ambiente virtual:
 ## 📦 Arquivos da Versão PRO
 
 ```
-Rubi/
+Ruby/
 │
 ├── main.py                 # Aplicação principal
 ├── requirements.txt        # Dependências
-├── Rubi.spec               # Configuração PyInstaller
+├── Ruby.spec               # Configuração PyInstaller
 ├── assets/                 # Fontes Quicksand, ícones e tema
 ├── README.md               # Este arquivo
 ├── MANUAL_DO_USUARIO.md    # Manual do usuário final
-├── GUIA_PYTHON_RUBI.md     # Documentação técnica didática
+├── GUIA_PYTHON_RUBY.md     # Documentação técnica didática
 ├── CLAUDE.md               # Contexto para IA
 └── Roadmap.md              # Documento vivo do projeto
 ```
@@ -404,9 +404,9 @@ Para dúvidas ou sugestões de melhorias, consulte a documentação técnica ou 
 
 ---
 
-## ♦ Branding Rubi
+## ♦ Branding Ruby
 
-**Ícone:** ♦ Losango do Rubi
+**Ícone:** ♦ Losango do Ruby
 **Cores:** Carmesim + Grafite (tons de joia)
 
 ---

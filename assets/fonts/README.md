@@ -2,7 +2,7 @@
 
 ## Quicksand (Google Fonts)
 
-**Fonte principal do projeto Rubi**
+**Fonte principal do projeto Ruby**
 
 ### Sobre a Fonte
 

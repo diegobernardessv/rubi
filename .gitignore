@@ -15,7 +15,7 @@ env/
 # PyInstaller
 build/
 dist/
-Rubi.exe
+Ruby.exe
 
 # IDEs
 .vscode/
@@ -48,5 +48,5 @@ MANUAL_DO_USUARIO.md
 MANUAL_DO_USUARIO.pdf
 CLAUDE.md
 Roadmap.md
-GUIA_PYTHON_RUBI.md
+GUIA_PYTHON_RUBY.md
 SETUP.md
