@@ -17,6 +17,32 @@ import shutil
 import unicodedata
 
 
+# Versão do schema do cache. Incrementar quando o conjunto de colunas mudar,
+# para invalidar caches antigos automaticamente (evita KeyError com dados velhos).
+_CACHE_SCHEMA = 3
+
+
+def _txt_val(v):
+    """Converte um valor de célula em texto, tratando nulos como string vazia."""
+    try:
+        if pd.isna(v):
+            return ''
+    except (TypeError, ValueError):
+        pass
+    return str(v)
+
+
+def _num_val(v):
+    """Formata número sem casas decimais desnecessárias (5.0 -> '5'); nulo -> ''."""
+    try:
+        if v is None or pd.isna(v):
+            return ''
+        f = float(v)
+        return str(int(f)) if f == int(f) else f"{f:g}"
+    except (ValueError, TypeError):
+        return str(v)
+
+
 def _status_normalizado(serie):
     """Normaliza uma coluna de Status para comparação robusta: sem acento,
     maiúsculas e sem espaços nas pontas.
@@ -942,10 +968,10 @@ class SolicitacoesAppPro:
             fg='#7f8c8d'
         ).pack(pady=50)
 
-    # ==================== ABA 4: RESUMO EXECUTIVO ====================
+    # ==================== ABA 4: RELATÓRIO DE ENTREGA ====================
     def criar_aba_resumo(self):
         self.aba_resumo = tk.Frame(self.notebook, bg='#fdecea')  # Rosa claro
-        self.notebook.add(self.aba_resumo, text='📄 Resumo Executivo')
+        self.notebook.add(self.aba_resumo, text='📄 Relatório de Entrega')
 
         # Botão de exportar
         btn_frame = tk.Frame(self.aba_resumo, bg='white')
@@ -994,10 +1020,10 @@ class SolicitacoesAppPro:
 
         self.resumo_text = tk.Text(
             text_frame,
-            font=('Consolas', 10),
+            font=('Consolas', 9),
             bg='#f8f9fa',
             fg='#2c2c2c',
-            width=84,
+            width=90,
             yscrollcommand=scroll_resumo.set,
             wrap=tk.NONE,
             padx=20,
@@ -1023,7 +1049,7 @@ class SolicitacoesAppPro:
         self.resumo_sidebar_content = tk.Frame(self.resumo_sidebar, bg='#fdecea')
         self.resumo_sidebar_content.pack(fill=tk.BOTH, expand=True, padx=8)
 
-        self.resumo_text.insert('1.0', "📄 Resumo Executivo será gerado após carregar os dados")
+        self.resumo_text.insert('1.0', "📄 Relatório de entrega será gerado após carregar os dados")
         self.resumo_text.config(state=tk.DISABLED)
 
     # ==================== FILTROS AVANÇADOS ====================
@@ -1093,16 +1119,24 @@ class SolicitacoesAppPro:
 
     # ---- Pipelines de filtro unificados ----
 
+    def _apenas_pendentes(self, df):
+        """Mantém só as solicitações pendentes — exclui EM APROVAÇÃO e
+        PRE-REQUISIÇÃO GERADA (comparação normalizada, pois a consulta SIMEC
+        devolve 'Em Aprovacao' / 'Pre-Requisicao Gerada'). É o mesmo recorte da
+        aba Solicitações Pendentes, reutilizado no Resumo Executivo e no PDF.
+        """
+        if df is None or df.empty or 'Status' not in df.columns:
+            return df.copy() if df is not None else df
+        excluir = {'EM APROVACAO', 'PRE-REQUISICAO GERADA'}
+        status_norm = _status_normalizado(df['Status'])
+        return df[~status_norm.isin(excluir)].copy()
+
     def _refresh_tabela_dados(self):
         """Pipeline unificado: aplica todos os filtros e atualiza a tabela da aba Dados."""
         if self.df_filtrado is None:
             return
 
-        # Esconde EM APROVAÇÃO e PRE-REQUISIÇÃO GERADA (comparação normalizada, pois
-        # a consulta SIMEC devolve 'Em Aprovacao' / 'Pre-Requisicao Gerada').
-        status_excluir = {'EM APROVACAO', 'PRE-REQUISICAO GERADA'}
-        status_norm = _status_normalizado(self.df_filtrado['Status'])
-        df = self.df_filtrado[~status_norm.isin(status_excluir)].copy()
+        df = self._apenas_pendentes(self.df_filtrado)
 
         armazem     = self.filtro_armazem_var.get()
         setor       = self.filtro_setor_var.get()
@@ -1295,11 +1329,14 @@ class SolicitacoesAppPro:
                 # Mapeamento para aba Dados e Dashboard
                 colunas_mapeamento = {
                 'Numero SA': 'Numero SA',
+                'Item': 'Item',
                 'Codigo': 'Codigo',
                 'Descricao do Material': 'Descricao',
                 'UM': 'Unidade de Medida',
                 'Armazem': 'Armazem',
                 'Quantidade': 'Quantidade',
+                'Qtd. Atendida': 'Qtd. Atendida',
+                'Saldo Atual': 'Saldo Atual',
                 'Dt. Emissao': 'Data Emissao',
                 'Status': 'Status',
                 'Setor': 'Setor',
@@ -1514,10 +1551,15 @@ class SolicitacoesAppPro:
                 self.tree.heading(col, text='Dt.Emissão')
             elif col in ['Numero SA', 'Codigo']:
                 width = 90
+            elif col == 'Item':
+                width = 45
             elif col == 'Armazem':
                 width = 60
-            elif col == 'Quantidade':
+            elif col in ('Quantidade', 'Saldo Atual'):
                 width = 80
+            elif col == 'Qtd. Atendida':
+                width = 80
+                self.tree.heading(col, text='Qtd.Atend.')
             elif col == 'Unidade de Medida':
                 width = 45
                 self.tree.heading(col, text='U.M.')
@@ -1541,7 +1583,7 @@ class SolicitacoesAppPro:
                     valores.append('')
                 elif col == 'Data Emissao' and isinstance(valor, pd.Timestamp):
                     valores.append(valor.strftime('%d/%m/%Y'))
-                elif col == 'Quantidade':
+                elif col in ('Quantidade', 'Saldo Atual', 'Qtd. Atendida'):
                     try:
                         int_val = int(valor)
                         valores.append(str(int_val) if valor == int_val else str(valor))
@@ -2114,7 +2156,13 @@ class SolicitacoesAppPro:
             self.resumo_text.config(state=tk.DISABLED)
             return
 
-        df = self.df_filtrado
+        # O Resumo é sobre as SOLICITAÇÕES PENDENTES (mesmo recorte da aba),
+        # então exclui EM APROVAÇÃO e PRE-REQUISIÇÃO GERADA.
+        df = self._apenas_pendentes(self.df_filtrado)
+        if df.empty:
+            self.resumo_text.insert('1.0', "📄 Nenhuma solicitação pendente no período")
+            self.resumo_text.config(state=tk.DISABLED)
+            return
 
         # Calcular período e dias úteis
         if self.filtro_data_inicio and self.filtro_data_fim:
@@ -2152,67 +2200,56 @@ class SolicitacoesAppPro:
                     dias_uteis += 1
                 data_atual += timedelta(days=1)
 
-        # Gerar resumo
+        # Relatório de separação e entrega (lista de itens pendentes por setor)
+        agora = datetime.now().strftime('%d/%m/%Y às %H:%M')
+        n_sas     = df['Numero SA'].nunique()
+        n_itens   = len(df)
+        n_setores = df['Setor'].nunique()
+        L = 90
+
+        cab = (f"{'SA':<7}{'It':<3}{'Cód':<9}{'Descrição':<28}"
+               f"{'Arm':<4}{'UM':<3}{'Qtd':>5}{'Atend':>6}{'Saldo':>7} Solicitante")
+
         resumo = f"""
-{'='*80}
-                    RESUMO EXECUTIVO - SOLICITAÇÕES AO ARMAZÉM
-{'='*80}
+{'='*L}
+{'RUBY — RELATÓRIO DE SEPARAÇÃO E ENTREGA'.center(L)}
+{'Solicitações pendentes do almoxarifado'.center(L)}
+{'='*L}
+Período: {data_inicio_str} a {data_fim_str}      Emitido em: {agora}
 
-📅 PERÍODO ANALISADO
-{'─'*80}
-Data Início: {data_inicio_str}
-Data Fim:    {data_fim_str}
-Dias úteis:  {dias_uteis} dias
-
-📊 ESTATÍSTICAS GERAIS
-{'─'*80}
-Total de Solicitações:        {df['Numero SA'].nunique():,}
-Total de Itens Solicitados:   {len(df):,}
-Setores Ativos:               {df['Setor'].nunique():,}
-Solicitantes:                 {df['Solicitante'].nunique():,}
-
-🏆 TOP 5 SETORES (por número de itens)
-{'─'*80}
+SAs pendentes: {n_sas}    Itens a separar: {n_itens}    Setores: {n_setores}
+(* saldo em estoque menor que a quantidade solicitada)
+{'='*L}
 """
-        top_setores = df['Setor'].value_counts().head(5)
-        for i, (setor, qtd) in enumerate(top_setores.items(), 1):
-            resumo += f"{i}. {setor[:50]:<50} {qtd:>10,} itens\n"
+        # Agrupa por Setor (área que vai receber o material), em ordem alfabética
+        for setor, grupo in sorted(df.groupby('Setor', dropna=False),
+                                   key=lambda g: str(g[0])):
+            setor_nome = _txt_val(setor) or '(sem setor)'
+            resumo += f"\n■ {setor_nome}  —  {len(grupo)} item(ns)\n{'─'*L}\n{cab}\n{'─'*L}\n"
+            grupo = grupo.sort_values(['Numero SA', 'Item'], na_position='last')
+            for _, r in grupo.iterrows():
+                qtd_v, sal_v = r.get('Quantidade'), r.get('Saldo Atual')
+                marca = ''
+                try:
+                    if pd.notna(qtd_v) and pd.notna(sal_v) and float(sal_v) < float(qtd_v):
+                        marca = '*'
+                except (ValueError, TypeError):
+                    pass
+                resumo += (
+                    f"{_txt_val(r.get('Numero SA')):<7}"
+                    f"{_num_val(r.get('Item')):<3}"
+                    f"{_txt_val(r.get('Codigo')):<9}"
+                    f"{_txt_val(r.get('Descricao'))[:27]:<28}"
+                    f"{_txt_val(r.get('Armazem')):<4}"
+                    f"{_txt_val(r.get('Unidade de Medida'))[:2]:<3}"
+                    f"{_num_val(qtd_v):>5}"
+                    f"{_num_val(r.get('Qtd. Atendida')):>6}"
+                    f"{_num_val(sal_v):>6}{marca:<1} "
+                    f"{_txt_val(r.get('Solicitante'))[:14]}\n"
+                )
 
-        resumo += f"""
-👥 TOP 5 SOLICITANTES (por número de solicitações)
-{'─'*80}
-"""
-        top_solicitantes = df['Solicitante'].value_counts().head(5)
-        for i, (solicitante, qtd) in enumerate(top_solicitantes.items(), 1):
-            resumo += f"{i}. {solicitante:<50} {qtd:>10,} solicitações\n"
-
-        resumo += f"""
-🎯 TOP 10 MATERIAIS MAIS SOLICITADOS
-{'─'*80}
-"""
-        top_materiais = df['Descricao'].value_counts().head(10)
-        for i, (material, qtd) in enumerate(top_materiais.items(), 1):
-            resumo += f"{i:>2}. {material[:60]:<60} {qtd:>8,}\n"
-
-        resumo += f"""
-📄 LISTA DE SAs ÚNICAS (sem repetição)
-{'─'*80}
-Total de SAs: {df['Numero SA'].nunique()}
-
-"""
-        sas_unicas = sorted(df['Numero SA'].unique())
-        for i, sa in enumerate(sas_unicas, 1):
-            resumo += f"{sa}  "
-            if i % 10 == 0:
-                resumo += "\n"
-
-        resumo += f"""
-
-{'='*80}
-Relatório gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}
-Ruby - Sistema de Controle de Solicitações
-{'='*80}
-"""
+        rodape = f"Ruby — Sistema de Controle de Solicitações  |  {agora}"
+        resumo += f"\n{'='*L}\n{rodape.center(L)}\n{'='*L}\n"
 
         self.resumo_text.insert('1.0', resumo)
         self.resumo_text.config(state=tk.DISABLED)
@@ -2517,6 +2554,10 @@ Ruby - Sistema de Controle de Solicitações
             if meta.get('hash') != arquivo_hash:
                 return None
 
+            # Invalida cache de schema antigo (colunas diferentes das atuais)
+            if meta.get('schema') != _CACHE_SCHEMA:
+                return None
+
             return {
                 'df_original':       pd.read_parquet(df1_path),
                 'df_status_original': pd.read_parquet(df2_path),
@@ -2535,7 +2576,7 @@ Ruby - Sistema de Controle de Solicitações
             data['df_original'].to_parquet(base + '_original.parquet', index=False)
             data['df_status_original'].to_parquet(base + '_status.parquet', index=False)
 
-            meta = {'hash': arquivo_hash, 'timestamp': datetime.now().isoformat()}
+            meta = {'hash': arquivo_hash, 'schema': _CACHE_SCHEMA, 'timestamp': datetime.now().isoformat()}
             with open(base + '.json', 'w', encoding='utf-8') as f:
                 json.dump(meta, f)
 
@@ -2666,10 +2707,12 @@ Ruby - Sistema de Controle de Solicitações
         Toast.show(self.root, "Gerando PDF, aguarde...", tipo='info', duration=2000)
         self.root.update()
 
-        import tempfile
-        temp_files = []  # acumulado progressivamente em _gerar_figuras_pdf para garantir limpeza
         try:
-            df = self.df_filtrado
+            # PDF reflete as solicitações pendentes (mesmo recorte da aba/Resumo)
+            df = self._apenas_pendentes(self.df_filtrado)
+            if df is None or df.empty:
+                Toast.show(self.root, "Nenhuma solicitação pendente para exportar", tipo='warning', duration=4000)
+                return
 
             # Período
             if self.filtro_data_inicio and self.filtro_data_fim:
@@ -2679,18 +2722,10 @@ Ruby - Sistema de Controle de Solicitações
                 data_inicio_str = df['Data Emissao'].min().strftime('%d/%m/%Y')
                 data_fim_str    = df['Data Emissao'].max().strftime('%d/%m/%Y')
 
-            # KPIs
+            # Totais do período (apenas pendentes)
             total_sas     = df['Numero SA'].nunique()
             total_itens   = len(df)
             total_setores = df['Setor'].nunique()
-            total_solicit = df['Solicitante'].nunique()
-
-            top_setores      = df['Setor'].value_counts().head(5)
-            top_solicitantes = df['Solicitante'].value_counts().head(5)
-            top_materiais    = df['Descricao'].value_counts().head(10)
-
-            # Gráficos como PNG temporários — passa temp_files para acumular progressivamente
-            self._gerar_figuras_pdf(temp_files)
 
             # Fontes (funciona em dev e no executável PyInstaller)
             if hasattr(sys, '_MEIPASS'):
@@ -2715,14 +2750,14 @@ Ruby - Sistema de Controle de Solicitações
             # Cabeçalho carmesim Ruby
             pdf.set_fill_color(220, 20, 60)
             pdf.rect(0, 0, 210, 30, 'F')
-            pdf.set_xy(MARGEM, 7)
+            pdf.set_xy(0, 7)
             pdf.set_text_color(255, 255, 255)
             pdf.set_font("Quicksand", "B", 17)
-            pdf.cell(0, 9, "RUBY - Sistema de Controle de Solicitacoes", ln=True)
-            pdf.set_xy(MARGEM, 19)
+            pdf.cell(210, 9, "RUBY - Relatorio de Separacao e Entrega", align='C', ln=True)
+            pdf.set_xy(0, 19)
             pdf.set_text_color(245, 230, 235)
             pdf.set_font("Quicksand", "", 9)
-            pdf.cell(0, 6, "Relatorio Executivo", ln=True)
+            pdf.cell(210, 6, "Solicitacoes pendentes do almoxarifado", align='C', ln=True)
 
             pdf.set_y(37)
             pdf.set_text_color(44, 62, 80)
@@ -2740,104 +2775,80 @@ Ruby - Sistema de Controle de Solicitações
             pdf.line(MARGEM, pdf.get_y(), MARGEM + LARGURA, pdf.get_y())
             pdf.ln(6)
 
-            # KPI boxes coloridos
+            # Resumo da operação
             pdf.set_font("Quicksand", "B", 11)
             pdf.set_text_color(44, 62, 80)
-            pdf.cell(LARGURA, 6, "ESTATISTICAS GERAIS", ln=True)
+            pdf.cell(LARGURA, 6,
+                     f"SAs pendentes: {total_sas}    Itens a separar: {total_itens}    Setores: {total_setores}",
+                     ln=True)
+            pdf.set_font("Quicksand", "", 8)
+            pdf.set_text_color(150, 150, 150)
+            pdf.cell(LARGURA, 5, "* saldo em estoque menor que a quantidade solicitada", ln=True)
+            pdf.set_text_color(44, 62, 80)
             pdf.ln(3)
 
-            box_w      = (LARGURA - 6) / 4
-            box_y      = pdf.get_y()
-            kpi_labels = ["Total de SAs", "Total de Itens", "Setores Ativos", "Solicitantes"]
-            kpi_values = [f"{total_sas:,}", f"{total_itens:,}", f"{total_setores:,}", f"{total_solicit:,}"]
-            kpi_cores  = [(220, 20, 60), (46, 204, 113), (155, 89, 182), (230, 126, 34)]
+            # Tabela de itens agrupada por Setor (área que vai receber)
+            COLS = [("SA", 16, 'C'), ("It", 7, 'C'), ("Cod", 18, 'C'),
+                    ("Descricao", 46, 'C'), ("Arm", 10, 'C'), ("UM", 9, 'C'),
+                    ("Qtd", 12, 'C'), ("Atend", 14, 'C'), ("Saldo", 14, 'C'),
+                    ("Solicitante", 34, 'C')]
 
-            for i, (label, value, cor) in enumerate(zip(kpi_labels, kpi_values, kpi_cores)):
-                x = MARGEM + i * (box_w + 2)
-                pdf.set_fill_color(*cor)
-                pdf.rect(x, box_y, box_w, 20, 'F')
-                pdf.set_xy(x, box_y + 3)
+            def _cabecalho_tabela():
+                pdf.set_font("Quicksand", "B", 7)
+                pdf.set_fill_color(44, 62, 80)
                 pdf.set_text_color(255, 255, 255)
-                pdf.set_font("Quicksand", "B", 14)
-                pdf.cell(box_w, 8, value, align='C')
-                pdf.set_xy(x, box_y + 13)
+                for nome, w, _ in COLS:
+                    pdf.cell(w, 6, nome, fill=True, align='C')
+                pdf.ln(6)
+                pdf.set_text_color(44, 62, 80)
+
+            for setor, grupo in sorted(df.groupby('Setor', dropna=False), key=lambda g: str(g[0])):
+                setor_nome = _txt_val(setor) or '(sem setor)'
+                pdf.ln(2)
+                # Barra do setor
+                pdf.set_font("Quicksand", "B", 10)
+                pdf.set_fill_color(220, 20, 60)
+                pdf.set_text_color(255, 255, 255)
+                pdf.cell(LARGURA, 7, f"  {setor_nome}  -  {len(grupo)} item(ns)", fill=True, ln=True)
+                pdf.set_text_color(44, 62, 80)
+                _cabecalho_tabela()
+
+                grupo = grupo.sort_values(['Numero SA', 'Item'], na_position='last')
                 pdf.set_font("Quicksand", "", 7)
-                pdf.cell(box_w, 5, label, align='C')
+                zebra = False
+                for _, r in grupo.iterrows():
+                    qtd_v, sal_v = r.get('Quantidade'), r.get('Saldo Atual')
+                    insuf = False
+                    try:
+                        insuf = pd.notna(qtd_v) and pd.notna(sal_v) and float(sal_v) < float(qtd_v)
+                    except (ValueError, TypeError):
+                        pass
 
-            pdf.set_y(box_y + 26)
-            pdf.set_text_color(44, 62, 80)
-            pdf.line(MARGEM, pdf.get_y(), MARGEM + LARGURA, pdf.get_y())
-            pdf.ln(6)
-
-            # TOP 5 SETORES
-            pdf.set_font("Quicksand", "B", 11)
-            pdf.cell(LARGURA, 6, "TOP 5 SETORES (por numero de itens)", ln=True)
-            pdf.ln(2)
-
-            for i, (setor, qtd) in enumerate(top_setores.items(), 1):
-                pdf.set_fill_color(245, 245, 245) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
-                setor_trunc = setor[:62] + "..." if len(setor) > 62 else setor
-                pdf.set_font("Quicksand", "", 10)
-                pdf.cell(8,   7, f"{i}.", fill=True)
-                pdf.cell(148, 7, setor_trunc, fill=True)
-                pdf.set_font("Quicksand", "B", 10)
-                pdf.cell(0,   7, f"{qtd:,}", align='R', fill=True, ln=True)
-
-            pdf.ln(5)
-
-            # TOP 5 SOLICITANTES
-            pdf.set_font("Quicksand", "B", 11)
-            pdf.cell(LARGURA, 6, "TOP 5 SOLICITANTES", ln=True)
-            pdf.ln(2)
-
-            for i, (nome, qtd) in enumerate(top_solicitantes.items(), 1):
-                pdf.set_fill_color(245, 245, 245) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
-                pdf.set_font("Quicksand", "", 10)
-                pdf.cell(8,   7, f"{i}.", fill=True)
-                pdf.cell(148, 7, nome[:62], fill=True)
-                pdf.set_font("Quicksand", "B", 10)
-                pdf.cell(0,   7, f"{qtd:,}", align='R', fill=True, ln=True)
-
-            pdf.ln(5)
-
-            # TOP 10 MATERIAIS
-            pdf.set_font("Quicksand", "B", 11)
-            pdf.cell(LARGURA, 6, "TOP 10 MATERIAIS MAIS SOLICITADOS", ln=True)
-            pdf.ln(2)
-
-            for i, (material, qtd) in enumerate(top_materiais.items(), 1):
-                pdf.set_fill_color(245, 245, 245) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
-                mat_trunc = material[:72] + "..." if len(material) > 72 else material
-                pdf.set_font("Quicksand", "", 9)
-                pdf.cell(10,  6, f"{i:>2}.", fill=True)
-                pdf.cell(146, 6, mat_trunc, fill=True)
-                pdf.set_font("Quicksand", "B", 9)
-                pdf.cell(0,   6, f"{qtd:,}", align='R', fill=True, ln=True)
+                    desc = _txt_val(r.get('Descricao'))
+                    desc = desc[:29] + '...' if len(desc) > 32 else desc
+                    valores = [
+                        _txt_val(r.get('Numero SA')),
+                        _num_val(r.get('Item')),
+                        _txt_val(r.get('Codigo')),
+                        desc,
+                        _txt_val(r.get('Armazem')),
+                        _txt_val(r.get('Unidade de Medida')),
+                        _num_val(qtd_v),
+                        _num_val(r.get('Qtd. Atendida')),
+                        _num_val(sal_v) + ('*' if insuf else ''),
+                        _txt_val(r.get('Solicitante'))[:18],
+                    ]
+                    pdf.set_fill_color(245, 245, 245) if zebra else pdf.set_fill_color(255, 255, 255)
+                    zebra = not zebra
+                    for (nome, w, al), txt in zip(COLS, valores):
+                        if nome == "Saldo" and insuf:
+                            pdf.set_text_color(200, 0, 0)
+                        pdf.cell(w, 5, txt, fill=True, align=al)
+                        if nome == "Saldo" and insuf:
+                            pdf.set_text_color(44, 62, 80)
+                    pdf.ln(5)
 
             self._pdf_rodape(pdf, MARGEM, LARGURA)
-
-            # ===== PÁGINAS DE GRÁFICOS =====
-            for titulo, img_path in temp_files:
-                pdf.add_page()
-
-                # Mini cabeçalho azul
-                pdf.set_fill_color(220, 20, 60)
-                pdf.rect(0, 0, 210, 14, 'F')
-                pdf.set_xy(MARGEM, 4)
-                pdf.set_text_color(255, 255, 255)
-                pdf.set_font("Quicksand", "B", 11)
-                pdf.cell(0, 6, "RUBY - Graficos Analiticos", ln=True)
-
-                pdf.set_y(21)
-                pdf.set_text_color(44, 62, 80)
-                pdf.set_font("Quicksand", "B", 12)
-                pdf.cell(LARGURA, 7, titulo, ln=True)
-                pdf.ln(4)
-
-                pdf.image(img_path, x=MARGEM, w=LARGURA)
-
-                self._pdf_rodape(pdf, MARGEM, LARGURA)
-
             pdf.output(filename)
             Toast.show(self.root, "PDF exportado com sucesso!", tipo='success', duration=3000)
 
@@ -2846,11 +2857,6 @@ Ruby - Sistema de Controle de Solicitações
             print(f"Erro detalhado PDF: {e}")
         finally:
             self.root.config(cursor='')
-            for _, path in temp_files:
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
 
     def _pdf_rodape(self, pdf, margem, largura):
         """Adiciona rodapé com timestamp e número de página."""
@@ -2866,58 +2872,6 @@ Ruby - Sistema de Controle de Solicitações
             f"Ruby  |  {datetime.now().strftime('%d/%m/%Y as %H:%M')}  |  Pag. {pdf.page_no()}",
             align='C'
         )
-
-    def _gerar_figuras_pdf(self, figuras: list):
-        """Gera figuras matplotlib como PNG temporários e acumula em `figuras` (titulo, path).
-        Recebe a lista por referência para que o finally do chamador possa limpar mesmo em erro parcial."""
-        import tempfile
-        df = self.df_filtrado
-
-        def _salvar_fig(fig, titulo):
-            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            fig.savefig(tmp.name, dpi=150, bbox_inches='tight')
-            plt.close(fig)
-            tmp.close()
-            figuras.append((titulo, tmp.name))
-
-        # Top 10 Setores
-        dados = df['Setor'].value_counts().head(10).sort_values(ascending=True)
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.barh(range(len(dados)), dados.values, color='#27ae60')
-        ax.set_yticks(range(len(dados)))
-        ax.set_yticklabels([s[:40] + '...' if len(s) > 40 else s for s in dados.index], fontsize=9)
-        ax.set_xlabel('Numero de Itens', fontsize=11)
-        ax.grid(True, alpha=0.3, axis='x')
-        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-        fig.tight_layout()
-        _salvar_fig(fig, "Top 10 Setores por Numero de Itens")
-
-        # Top 10 Solicitantes
-        dados = df['Solicitante'].value_counts().head(10).sort_values(ascending=True)
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.barh(range(len(dados)), dados.values, color='#9b59b6')
-        ax.set_yticks(range(len(dados)))
-        ax.set_yticklabels(dados.index, fontsize=9)
-        ax.set_xlabel('Numero de Solicitacoes', fontsize=11)
-        ax.grid(True, alpha=0.3, axis='x')
-        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-        fig.tight_layout()
-        _salvar_fig(fig, "Top 10 Solicitantes")
-
-        # Distribuição por dia da semana
-        dias_map  = {0: 'Seg', 1: 'Ter', 2: 'Qua', 3: 'Qui', 4: 'Sex', 5: 'Sab', 6: 'Dom'}
-        ordem     = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom']
-        dias_serie = df['Data Emissao'].dt.dayofweek.map(dias_map).value_counts()
-        dias_serie = dias_serie.reindex([d for d in ordem if d in dias_serie.index])
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.bar(range(len(dias_serie)), dias_serie.values, color='#DC143C')
-        ax.set_xticks(range(len(dias_serie)))
-        ax.set_xticklabels(dias_serie.index, fontsize=10)
-        ax.set_ylabel('Numero de Solicitacoes', fontsize=11)
-        ax.grid(True, alpha=0.3, axis='y')
-        ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
-        fig.tight_layout()
-        _salvar_fig(fig, "Distribuicao por Dia da Semana")
 
 if __name__ == "__main__":
     _registrar_fontes()
