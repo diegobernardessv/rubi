@@ -15,7 +15,7 @@ env/
 # PyInstaller
 build/
 dist/
-Ruby.exe
+ruby.exe
 
 # IDEs
 .vscode/

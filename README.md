@@ -324,11 +324,11 @@ Ou com ambiente virtual:
 ## 📦 Arquivos da Versão PRO
 
 ```
-Ruby/
+ruby/
 │
 ├── main.py                 # Aplicação principal
 ├── requirements.txt        # Dependências
-├── Ruby.spec               # Configuração PyInstaller
+├── ruby.spec               # Configuração PyInstaller
 ├── assets/                 # Fontes Quicksand, ícones e tema
 ├── README.md               # Este arquivo
 ├── MANUAL_DO_USUARIO.md    # Manual do usuário final
