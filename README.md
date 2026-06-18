@@ -322,7 +322,7 @@ Ou com ambiente virtual:
 ## 📦 Arquivos da Versão PRO
 
 ```
-Rubi/
+Ruby/
 │
 ├── main.py                 # Aplicação principal
 ├── requirements.txt        # Dependências
@@ -402,7 +402,7 @@ Para dúvidas ou sugestões de melhorias, consulte a documentação técnica ou 
 
 ---
 
-## ♦ Branding Rubi
+## ♦ Branding Ruby
 
 **Ícone:** ♦ Losango do Rubi
 **Cores:** Carmesim + Grafite (tons de joia)
