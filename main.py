@@ -1683,6 +1683,16 @@ class SolicitacoesAppPro:
                         time.sleep(espera)
                         continue
                     raise
+                except AttributeError as e:
+                    # No late binding dinâmico, quando o Excel está ocupado ele
+                    # rejeita o GetIDsOfNames usado para resolver o nome do método;
+                    # o win32com engole esse com_error de "ocupado" e o converte em
+                    # AttributeError (ex.: "Excel.Application.CalculateFull"). Como
+                    # aqui só chamamos métodos que sabidamente existem (CalculateFull,
+                    # Refresh, Save, ...), tratamos isso como "ocupado, tente de novo".
+                    ultimo = e
+                    time.sleep(espera)
+                    continue
             if ultimo is not None:
                 raise ultimo
 
@@ -1711,7 +1721,7 @@ class SolicitacoesAppPro:
 
             # Drena qualquer consulta que o Excel tenha disparado ao abrir (params
             # antigos), senão ele fica ocupado e rejeita as chamadas seguintes.
-            _com_retry(excel.CalculateUntilAsyncQueriesDone)
+            _com_retry(lambda: excel.CalculateUntilAsyncQueriesDone())
 
             if _com_retry(lambda: wb.ReadOnly):
                 raise RuntimeError("a cópia de trabalho abriu como somente-leitura")
@@ -1732,7 +1742,7 @@ class SolicitacoesAppPro:
             # (escrever datetime via COM exigiria win32timezone; o número evita isso).
             _com_retry(lambda: setattr(ws.Range("C1"), 'Value', _serial_excel(data_inicio)))
             _com_retry(lambda: setattr(ws.Range("C2"), 'Value', _serial_excel(data_fim)))
-            _com_retry(excel.CalculateFull)
+            _com_retry(lambda: excel.CalculateFull())
 
             # Atualiza de forma SÍNCRONA: QueryTable.Refresh(False) força a consulta
             # sem segundo plano, evitando o Save antes de a query terminar.
@@ -1772,10 +1782,10 @@ class SolicitacoesAppPro:
                             _set(getattr(conn, attr), 'BackgroundQuery', False)
                         except Exception:
                             pass
-                    _com_retry(conn.Refresh)
-                _com_retry(excel.CalculateUntilAsyncQueriesDone)
+                    _com_retry(lambda c=conn: c.Refresh())
+                _com_retry(lambda: excel.CalculateUntilAsyncQueriesDone())
 
-            _com_retry(wb.Save)
+            _com_retry(lambda: wb.Save())
             return work
 
         except Exception as e:
